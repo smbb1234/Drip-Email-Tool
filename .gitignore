@@ -1,2 +1,5 @@
+# IDE directories
+.idea/
+
 # Requirements report
 *.docx
