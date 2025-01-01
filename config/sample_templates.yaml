@@ -1,0 +1,6 @@
+- sequence: 1
+  subject: "Hello {name}, let's connect!"
+  content: "Hi {name},\n\nWe noticed you're interested in {topic}. Let us know how we can help!\n\nBest,\nThe Team"
+- sequence: 2
+  subject: "Following up, {name}"
+  content: "Hi {name},\n\nJust wanted to follow up on my previous email. Let me know if you're available to chat.\n\nThanks,\nThe Team"
