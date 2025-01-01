@@ -2,17 +2,6 @@
 
 ---
 
-## General Requirements
-
-- [ ] Automate email campaigns with a drip sequence until a prospect responds.
-- [ ] Support multiple concurrent campaigns.
-- [ ] Provide monitoring and reporting on campaign performance.
-- [ ] Use the SendGrid API for reliable email delivery.
-- [ ] Ensure scalability, modularity, and reliability in the solution.
-- [ ] Separate business logic from user inputs.
-
----
-
 ## Workflow Design
 ### 1. Input Preparation
 
@@ -27,9 +16,9 @@
 - Convert data into standardized Python data structures.
 
 **Tasks**:
-- [ ] Implement `load_contacts` function: Parse CSV files and validate field completeness.
-- [ ] Implement `load_templates` function: Parse YAML files and handle placeholders (e.g., `{name}`).
-- [ ] Implement `load_schedule` function: Parse JSON files and validate date-time format.
+- [x] Implement `load_contacts` function: Parse CSV files and validate field completeness.
+- [x] Implement `load_templates` function: Parse YAML files and handle placeholders (e.g., `{name}`).
+- [x] Implement `load_schedule` function: Parse JSON files and validate date-time format.
 
 ---
 
@@ -111,8 +100,8 @@
 - Log system events, errors, and campaign activities.
 
 **Tasks**:
-- [ ] Implement `initialize_logger` function: Configure logging to files and the console.
-- [ ] Implement `log_event` function: Record logs at different levels (INFO, ERROR, etc.).
+- [x] Implement `initialize_logger` function: Configure logging to files and the console.
+- [x] Implement `log_event` function: Record logs at different levels (INFO, ERROR, etc.).
 
 ---
 

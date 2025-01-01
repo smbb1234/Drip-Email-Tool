@@ -1,5 +1,9 @@
 # IDE directories
 .idea/
 
+# IDE directories
+.logs/
+
 # Requirements report
 *.docx
+/logs/app.log
