@@ -3,7 +3,7 @@ import os
 import json
 from ruamel.yaml import YAML
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
-from src.modules.input_parser import load_contacts, load_templates, load_schedule
+from src.modules.input_parser import InputParser
 
 class TestInputParser(unittest.TestCase):
 
@@ -47,13 +47,14 @@ class TestInputParser(unittest.TestCase):
             sample_schedule = [
                 {
                     "campaign_id": "campaign_1",
-                    "start_time": "2025-01-02T09:00:00",
-                    "interval": 2
+                    "sequences": [
+                        {"sequence": 1, "start_time": "2025-01-10T09:00:00", "interval": 2},
+                        {"sequence": 2, "start_time": "2025-01-11T10:00:00", "interval": 3}
+                    ]
                 },
                 {
                     "campaign_id": "campaign_2",
-                    "start_time": "2025-01-03T10:00:00",
-                    "interval": 3
+                    "sequences": []
                 }
             ]
             # noinspection PyTypeChecker
@@ -69,7 +70,7 @@ class TestInputParser(unittest.TestCase):
 
     def test_load_contacts(self):
         """Test loading and validation of contacts."""
-        contacts = load_contacts(self.sample_contacts_path)
+        contacts = InputParser.load_contacts(self.sample_contacts_path)
         self.assertEqual(len(contacts), 2)  # Invalid email should be skipped
         self.assertEqual(contacts[0]["name"], "John Doe")
         self.assertEqual(contacts[0]["email"], "john.doe@example.com")
@@ -77,7 +78,7 @@ class TestInputParser(unittest.TestCase):
 
     def test_load_templates(self):
         """Test loading and validation of templates."""
-        templates = load_templates(self.sample_templates_path)
+        templates = InputParser.load_templates(self.sample_templates_path)
         self.assertEqual(len(templates), 2)
         self.assertEqual(templates[0]["sequence"], 1)
         self.assertIn("{name}", templates[0]["subject"])
@@ -85,20 +86,19 @@ class TestInputParser(unittest.TestCase):
 
     def test_load_schedule(self):
         """Test loading and validation of schedule."""
-        schedule = load_schedule(self.sample_schedule_path)
+        schedule = InputParser.load_schedule(self.sample_schedule_path)
         self.assertEqual(len(schedule), 2)
         self.assertEqual(schedule[0]["campaign_id"], "campaign_1")
-        self.assertEqual(schedule[0]["start_time"], "2025-01-02T09:00:00")
-        self.assertEqual(schedule[0]["interval"], 2)
+        self.assertEqual(len(schedule[0]["sequences"]), 2)
 
     def test_invalid_file_paths(self):
         """Test handling of non-existent files."""
         with self.assertRaises(FileNotFoundError):
-            load_contacts("nonexistent.csv")
+            InputParser.load_contacts("nonexistent.csv")
         with self.assertRaises(FileNotFoundError):
-            load_templates("nonexistent.yaml")
+            InputParser.load_templates("nonexistent.yaml")
         with self.assertRaises(FileNotFoundError):
-            load_schedule("nonexistent.json")
+            InputParser.load_schedule("nonexistent.json")
 
     def test_invalid_file_content(self):
         """Test handling of invalid file content."""
@@ -107,7 +107,7 @@ class TestInputParser(unittest.TestCase):
             f.write("Not a valid JSON")
 
         with self.assertRaises(ValueError):
-            load_schedule(invalid_file_path)
+            InputParser.load_schedule(invalid_file_path)
 
         os.remove(invalid_file_path)
 

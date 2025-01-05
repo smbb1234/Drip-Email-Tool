@@ -2,9 +2,8 @@ import logging
 import os
 from functools import wraps
 
-
 # Logger setup
-def initialize_logger(log_file: str = "app.log", log_level: int = logging.DEBUG):
+def initialize_logger(log_file: str = "app.log", log_level: int = logging.DEBUG) -> None:
     log_path = "../../logs"
     """Initialize the logging configuration."""
     if not os.path.exists(log_path):
@@ -20,6 +19,19 @@ def initialize_logger(log_file: str = "app.log", log_level: int = logging.DEBUG)
         ]
     )
 
+def log_event(event: str, level: str = "INFO") -> None:
+    """Log a specific event with a given severity level."""
+    level = level.upper()
+    if level == "INFO":
+        logging.info(event)
+    elif level == "WARNING":
+        logging.warning(event)
+    elif level == "ERROR":
+        logging.error(event)
+    elif level == "DEBUG":
+        logging.debug(event)
+    else:
+        logging.info(f"[UNDEFINED LEVEL] {event}")
 
 # Decorator for logging
 def log_function_call(func):
@@ -37,22 +49,6 @@ def log_function_call(func):
             raise
 
     return wrapper
-
-
-def log_event(event: str, level: str = "INFO"):
-    """Log a specific event with a given severity level."""
-    level = level.upper()
-    if level == "INFO":
-        logging.info(event)
-    elif level == "WARNING":
-        logging.warning(event)
-    elif level == "ERROR":
-        logging.error(event)
-    elif level == "DEBUG":
-        logging.debug(event)
-    else:
-        logging.info(f"[UNDEFINED LEVEL] {event}")
-
 
 # Example usage of the logger
 if __name__ == "__main__":
