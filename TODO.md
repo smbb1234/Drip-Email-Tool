@@ -32,10 +32,10 @@
 - Track progress for each contact.
 
 **Tasks**:
-- [ ] Implement `initialize_campaign` function: Initialize campaigns and store states.
-- [ ] Implement `start_campaign` function: Start a specified campaign.
-- [ ] Implement `update_campaign_status` function: Update progress for contacts (e.g., Email Sent, Reply Received).
-- [ ] Implement `get_campaign_status` function: Query the current state of campaigns.
+- [x] Implement `initialize_campaign` function: Initialize campaigns and store states.
+- [x] Implement `start_campaign` function: Start a specified campaign.
+- [x] Implement `update_campaign_status` function: Update progress for contacts (e.g., Email Sent, Reply Received).
+- [x] Implement `get_campaign_status` function: Query the current state of campaigns.
 
 ---
 

@@ -1,4 +1,5 @@
 # Proposed Directory Structure
+```plaintext
 drip_email_tool/
 ├── src/
 │   ├── main.py                     # Main script entry point
@@ -31,3 +32,4 @@ drip_email_tool/
 ├── Dockerfile                      # Docker configuration
 ├── requirements.txt                # Python dependencies
 └── README.md                       # Project description
+```

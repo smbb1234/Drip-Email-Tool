@@ -6,4 +6,12 @@
 
 # Requirements report
 *.docx
+
+# Logs report
 /logs/app.log
+
+# API-KEY
+sendgrid.env
+
+# Temporary data files
+campaign_state.json
