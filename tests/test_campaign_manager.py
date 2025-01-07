@@ -32,12 +32,13 @@ class TestCampaignManager(unittest.TestCase):
         if os.path.exists(self.store_file):
             os.remove(self.store_file)
 
-        self.manager = CampaignManager(
-            contacts=self.contacts,
-            templates=self.templates,
-            schedule=self.schedule,
-            store_file=self.store_file
+        campaign_data = CampaignManager.build_campaign_data(
+            self.contacts,
+            self.templates,
+            self.schedule
         )
+
+        self.manager = CampaignManager(campaign_data, self.store_file)
 
     def tearDown(self):
         if os.path.exists(self.store_file):
@@ -62,9 +63,16 @@ class TestCampaignManager(unittest.TestCase):
         self.assertFalse(result)
 
     def test_update_campaign_status(self):
+        """Test updating the status of a campaign."""
+        self.manager.start_campaign("campaign_1")
+        result = self.manager.update_campaign_status("campaign_1", "Completed")
+        self.assertTrue(result)
+        self.assertEqual(self.manager.campaigns["campaign_1"]["status"], "Completed")
+
+    def test_update_contact_campaign_status(self):
         """Test updating the status of a contact in a campaign."""
         self.manager.start_campaign("campaign_1")
-        result = self.manager.update_campaign_status(
+        result = self.manager.update_contact_campaign_status(
             "campaign_1", "john.doe@example.com", "Email Sent"
         )
         self.assertTrue(result)
@@ -75,14 +83,22 @@ class TestCampaignManager(unittest.TestCase):
 
     def test_update_invalid_status(self):
         """Test updating a contact's status to an invalid value."""
-        result = self.manager.update_campaign_status(
+        result = self.manager.update_campaign_status("campaign_1", "Invalid Status")
+        self.assertFalse(result)
+
+        result = self.manager.update_contact_campaign_status(
             "campaign_1", "john.doe@example.com", "Invalid Status"
         )
         self.assertFalse(result)
 
-    def test_update_campaign_status_nonexistent_contact(self):
+    def test_update_campaign_status_nonexistent_campaign(self):
+        """Test updating the status of a nonexistent campaign."""
+        result = self.manager.update_campaign_status("nonexistent", "Closed")
+        self.assertFalse(result)
+
+    def test_update_contact_campaign_status_nonexistent_contact(self):
         """Test updating a status for a contact that doesn't exist."""
-        result = self.manager.update_campaign_status("campaign_1", "nonexistent@example.com", "Completed")
+        result = self.manager.update_contact_campaign_status("campaign_1", "nonexistent@example.com", "Completed")
         self.assertFalse(result)
 
     def test_get_campaign(self):
@@ -102,7 +118,7 @@ class TestCampaignManager(unittest.TestCase):
         self.manager.start_campaign("campaign_1")
         self.manager.save_state()
 
-        new_manager = CampaignManager(store_file=self.store_file)
+        new_manager = CampaignManager(None, self.store_file)
         self.assertIn("campaign_1", new_manager.campaigns)
         self.assertEqual(new_manager.campaigns["campaign_1"]["status"], "In Progress")
 

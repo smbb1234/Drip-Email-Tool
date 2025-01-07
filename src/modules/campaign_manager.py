@@ -1,39 +1,38 @@
 import os
 from typing import Dict, List
 from src.modules import log_event
-from src.utils import validate_campaign_data, Utils
+from src.utils import Validator, Utils
 
 class CampaignManager:
     """Manage email campaigns and track their progress."""
-    CONTACT_ALLOWED_STATUSES = {"Pending", "Email Sent", "Reply Received"}
+    CONTACT_ALLOWED_STATUSES = {"Not Started", "Pending", "Email Sent", "Reply Received", "Closed"}
     CAMPAIGN_ALLOWED_STATUSES = {"Not Started", "In Progress", "Completed"}
 
-    def __init__(self, **kwargs):
+    def __init__(self, campaign_data: Dict | None, store_file: str = "campaigns.json"):
         """Initialize the campaign manager."""
         self.campaigns = {}
-        self.store_file = kwargs.get("store_file")
+        self.store_file = store_file
 
-        if self.store_file is None:
-            self.store_file = "campaigns.json"
-
-        _campaign_data = kwargs.get("campaign_data")
-        _contacts = kwargs.get("contacts")
-        _templates = kwargs.get("templates")
-        _schedule = kwargs.get("schedule")
-
-        if _campaign_data is not None:
-            self.initialize_campaign(_campaign_data)
-            return
-
-        if _contacts is not None and _templates is not None and _schedule is not None:
-            self.initialize_campaign(self.build_campaign_data(_contacts, _templates, _schedule))
-            return
-
-        if os.path.exists(self.store_file):
+        # Create a new CampaignManager instance from a store file.
+        if campaign_data is None and os.path.exists(self.store_file):
             self.campaigns = Utils.load_json_file(self.store_file)
-            log_event("Loaded campaign state from file.", "INFO")
-        else:
-            log_event("No campaign state file found. Initializing an empty campaign manager.", "WARNING")
+            log_event("Campaign state file loaded successfully.", "INFO")
+            return
+
+        if campaign_data is not None:
+            self.initialize_campaign(campaign_data)
+            return
+
+        log_event("Failed to initialize CampaignManager instance.", "ERROR")
+
+    @classmethod
+    def from_parser(cls, contacts: List[Dict], templates: List[Dict], schedule: List[Dict]):
+        """Create a new CampaignManager instance from a parser."""
+        if contacts is not None and templates is not None and schedule is not None:
+            return cls(cls.build_campaign_data(contacts, templates, schedule))
+
+        log_event("Failed to create CampaignManager instance from parser.", "ERROR")
+        return None
 
     @staticmethod
     def build_campaign_data(contacts: List[Dict], templates: List[Dict], schedule: List[Dict]) -> Dict:
@@ -44,20 +43,20 @@ class CampaignManager:
             "schedule": schedule
         }
 
-    def initialize_campaign(self, _campaign_data: Dict) -> bool:
+    def initialize_campaign(self, campaign_data: Dict) -> bool:
         """Initialize a new campaign with the provided data."""
-        if not validate_campaign_data(_campaign_data):
+        if not Validator.validate_campaign_data(campaign_data):
             log_event("Campaign data validation failed. Initialization aborted.", "ERROR")
             return False
 
         # Set Email as key
         enriched_contacts = {
             _contact["email"]: {key: value for key, value in _contact.items() if key != "email"}
-            for _contact in _campaign_data["contacts"]
+            for _contact in campaign_data["contacts"]
         }
 
-        template_map = {template["sequence"]: template for template in _campaign_data["templates"]}# Create a mapping of sequence number to template
-        for campaign in _campaign_data["schedule"]:
+        template_map = {template["sequence"]: template for template in campaign_data["templates"]}# Create a mapping of sequence number to template
+        for campaign in campaign_data["schedule"]:
             if campaign["campaign_id"] in self.campaigns:
                 log_event(
                     f"Duplicate campaign ID {campaign['campaign_id']} detected. Skipping initialization for this campaign.",
@@ -75,12 +74,13 @@ class CampaignManager:
                 "contacts": {
                     contact: {
                         "info": enriched_contacts[contact],
-                        "stage": 1,
-                        "progress": "Pending"
+                        "current_stage": 1,
+                        "total_stage": len(campaign["sequences"]),
+                        "progress": "Not Started"
                     }
                     for contact in enriched_contacts
                 },
-                "templates": _campaign_data["templates"],
+                "templates": campaign_data["templates"],
                 "schedule": campaign["sequences"],
                 "status": "Not Started"
             }
@@ -101,12 +101,32 @@ class CampaignManager:
             log_event(f"Campaign {campaign_id} cannot be started. Current status: {campaign['status']}", "WARNING")
             return False
 
+        for contact in campaign["contacts"]:
+            campaign["contacts"][contact]["progress"] = "Pending"
+
         campaign["status"] = "In Progress"
         self.save_state()
         log_event(f"Campaign {campaign_id} started.", "INFO")
         return True
 
-    def update_campaign_status(self, campaign_id: str, contact_email: str, status: str) -> bool:
+    def update_campaign_status(self, campaign_id: str, status: str) -> bool:
+        """Update the status of the campaign."""
+        if campaign_id not in self.campaigns:
+            log_event(f"Campaign {campaign_id} does not exist.", "ERROR")
+            return False
+
+        if status not in self.CAMPAIGN_ALLOWED_STATUSES:
+            log_event(f"Invalid status '{status}' for campaign {campaign_id}. Allowed statuses: {self.CAMPAIGN_ALLOWED_STATUSES}.", "ERROR")
+            return False
+
+        campaign = self.campaigns[campaign_id]
+        campaign["status"] = status
+        self.save_state()
+
+        log_event(f"Updated campaign {campaign_id} to status: {status}.", "INFO")
+        return True
+
+    def update_contact_campaign_status(self, campaign_id: str, contact_email: str, status: str) -> bool:
         """Update the status of a specific contact in the campaign."""
         if campaign_id not in self.campaigns:
             log_event(f"Campaign {campaign_id} does not exist.", "ERROR")
@@ -136,6 +156,93 @@ class CampaignManager:
 
         log_event(f"Retrieved data for campaign: {campaign_id}.", "INFO")
         return self.campaigns[campaign_id]
+
+    def get_all_contacts(self, campaign_id: str) -> Dict:
+        """Retrieve all contacts in the campaign."""
+        if campaign_id not in self.campaigns:
+            log_event(f"Campaign {campaign_id} does not exist.", "ERROR")
+            return {}
+
+        log_event(f"Retrieved all contacts for campaign: {campaign_id}.", "INFO")
+        return self.campaigns[campaign_id]["contacts"]
+
+    def get_contact_campaign_status(self, campaign_id: str, contact_email: str) -> Dict:
+        """Retrieve the status of a specific contact in the campaign."""
+        if campaign_id not in self.campaigns:
+            log_event(f"Campaign {campaign_id} does not exist.", "ERROR")
+            return {}
+
+        campaign = self.campaigns[campaign_id]
+        if contact_email not in campaign["contacts"]:
+            log_event(f"Contact {contact_email} not found in campaign {campaign_id}.", "ERROR")
+            return {}
+
+        log_event(f"Retrieved data for contact {contact_email} in campaign {campaign_id}.", "INFO")
+        return campaign["contacts"][contact_email]
+
+    def get_current_stage(self, campaign_id: str, contact_email: str) -> dict:
+        """Get the current stage of a contact in a campaign."""
+        if campaign_id not in self.campaigns:
+            log_event(f"Campaign {campaign_id} does not exist.", "ERROR")
+            return {}
+
+        campaign = self.campaigns[campaign_id]
+        if contact_email not in campaign["contacts"]:
+            log_event(f"Contact {contact_email} not found in campaign {campaign_id}.", "ERROR")
+            return {}
+
+        return campaign["schedule"][campaign["contacts"][contact_email]["current_stage"] - 1]
+
+    def move_to_next_stage(self, campaign_id: str, contact_email: str) -> int:
+        """Move a contact to the next stage in the campaign."""
+        if campaign_id not in self.campaigns:
+            log_event(f"Campaign {campaign_id} does not exist.", "ERROR")
+            return -1
+
+        campaign = self.campaigns[campaign_id]
+        if contact_email not in campaign["contacts"]:
+            log_event(f"Contact {contact_email} not found in campaign {campaign_id}.", "ERROR")
+            return -1
+
+        contact = campaign["contacts"][contact_email]
+        if contact["current_stage"] >= contact["total_stage"]:
+            log_event(f"Contact {contact_email} has reached the end of the campaign {campaign_id}. Current/Total: {contact["current_stage"]}/{contact["total_stage"]}.", "INFO")
+            self.update_contact_campaign_status(campaign_id, contact_email, "Closed")
+            return 0
+
+        self.update_contact_campaign_status(campaign_id, contact_email, "Pending")
+        contact["current_stage"] += 1
+        self.save_state()
+        log_event(f"Moved contact {contact_email} to the next stage in campaign {campaign_id}.", "INFO")
+        return 1
+
+    def get_current_stage_template(self, campaign_id: str, sequence: int) -> dict:
+        """Get the template for the current stage of a campaign."""
+        if campaign_id not in self.campaigns:
+            log_event(f"Campaign {campaign_id} does not exist.", "ERROR")
+            return {}
+
+        campaign = self.campaigns[campaign_id]
+        if sequence > len(campaign["schedule"]):
+            log_event(f"Sequence {sequence} is out of range for campaign {campaign_id}.", "ERROR")
+            return {}
+
+        return campaign["templates"][sequence - 1]
+
+    def completed_campaign(self, campaign_id: str) -> bool:
+        """Get all completed campaigns."""
+        for _, contact in self.campaigns[campaign_id]["contacts"].items():
+            if contact["progress"] != "Closed":
+                return False
+        self.update_campaign_status(campaign_id, "Completed")
+        return True
+
+    def completed_all_campaigns(self) -> bool:
+        """Get all completed campaigns."""
+        for campaign_id, _ in self.campaigns.items():
+            if not self.completed_campaign(campaign_id):
+                return False
+        return True
 
     def save_state(self):
         """Save the current campaign state to the state file."""
@@ -183,17 +290,15 @@ if __name__ == "__main__":
         ]}
     ]
 
-    CampaignManager.delete_state("campaigns.json")
+    if os.path.exists("campaigns.json"):
+        CampaignManager.delete_state("campaigns.json")
 
     campaign_data = CampaignManager.build_campaign_data(example_contacts, example_templates, example_schedule)
 
-    manager_1 = CampaignManager(campaign_data=campaign_data)
-
-    # manager_1 = CampaignManager(store_file="campaigns.json")
-    # manager_1.initialize_campaign(campaign_data)
-
-    # manager_1 = CampaignManager(contacts=example_contacts, templates=example_templates, schedule=example_schedule)
+    manager_1 = CampaignManager(campaign_data)
+    # manager_1 = CampaignManager(None)
+    # manager_1 = CampaignManager.from_parser(example_contacts, example_templates, example_schedule)
 
     manager_1.start_campaign("campaign_1")
-    manager_1.update_campaign_status("campaign_1", "john.doe@example.com", "Email Sent")
+    manager_1.update_contact_campaign_status("campaign_1", "john.doe@example.com", "Email Sent")
     print(manager_1.get_campaign_status("campaign_1"))
