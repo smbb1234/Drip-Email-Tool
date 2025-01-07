@@ -4,15 +4,10 @@ import json
 import yaml
 from typing import List, Dict
 from src.modules import log_event
+from src.utils import Validator
 
 class InputParser:
-    @staticmethod
-    def validate_email_format(email: str) -> bool:
-        """Validate the format of an email address using a simple regex."""
-        import re
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        return re.match(pattern, email) is not None
-
+    """Utility class for parsing input data."""
     @staticmethod
     def load_contacts(file_path: str) -> List[Dict]:
         """Load and validate contacts from a CSV file."""
@@ -30,7 +25,7 @@ class InputParser:
 
         _contacts = []
         for _, row in df.iterrows():
-            if not InputParser.validate_email_format(row["email"]):
+            if not Validator.validate_email_format(row["email"]):
                 log_event(f"Invalid email skipped: {row['email']}", "WARNING")
                 continue  # Skip invalid email
             _contacts.append({

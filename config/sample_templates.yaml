@@ -4,3 +4,6 @@
 - sequence: 2
   subject: "Following up, {name}"
   content: "Hi {name},\n\nJust wanted to follow up on my previous email. Let me know if you're available to chat.\n\nThanks,\nThe Team"
+- sequence: 3
+  subject: "Re: {topic} Inquiry"
+  content: "Hi {name},\n\nThanks for reaching out. I'd be happy to help with your {topic} inquiry. When are you available to chat?\n\nBest,\nThe Team"
