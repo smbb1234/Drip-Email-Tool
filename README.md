@@ -1,4 +1,4 @@
-# Proposed Directory Structure
+# Expected Directory Structure
 ```plaintext
 drip_email_tool/
 ├── src/

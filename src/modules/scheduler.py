@@ -19,7 +19,7 @@ class Scheduler:
                 log_event(f"Start time for campaign {campaign_id} has already passed.", "WARNING")
                 return False
 
-            log_event(f"Scheduling campaign {campaign_id} to start at {campaign_start_time}.", "INFO")
+            log_event(f"Scheduling {campaign_id} to start at {campaign_start_time}.", "INFO")
 
             _contacts = self.campaign_manager.get_all_contacts(campaign_id)
             for contact_email, _ in _contacts.items():
@@ -69,7 +69,7 @@ class Scheduler:
             if start_datetime <= datetime.now() + timedelta(days=delay):
                 current_campaign_stage["start_time"] = (datetime.now() + timedelta(days=delay)).isoformat()
 
-            log_event(f"Scheduling next email for {contact_email} in campaign {campaign_id} in {delay} days. Current/Total: {current_campaign_contact["current_stage"]}/{current_campaign_contact["total_stage"]}. Start Time: {current_campaign_stage['start_time']}", "INFO")
+            log_event(f"Scheduling next email for {contact_email} in {campaign_id} in {delay} days. Current/Total: {current_campaign_contact['current_stage']}/{current_campaign_contact['total_stage']}. Start Time: {current_campaign_stage['start_time']}", "INFO")
 
             if not self.scheduler.get_job(f"{campaign_id}_{contact_email}"):
                 log_event(f"Job for contact {contact_email} in campaign {campaign_id} not found during removal.", "WARNING")
@@ -113,15 +113,15 @@ if __name__ == "__main__":
 
     # initialize_logger()
 
-    contacts_file = "../../config/sample_contacts.csv"
-    templates_file = "../../config/sample_templates.yaml"
-    schedule_file = "../../config/sample_schedule.json"
+    contacts_file = "../../data/contacts.csv"
+    templates_file = "../../data/templates.yaml"
+    schedule_file = "../../data/schedule.json"
 
     def start_action(*args):
-        print(f"Start action, {args[0]}, stage: {args[2]["contacts"][args[1]]["current_stage"]},{args[1]}, {args[2]["contacts"][args[1]]["progress"]}, {datetime.now()}")
+        print(f"Start action, {args[0]}, stage: {args[2]['contacts'][args[1]]['current_stage']},{args[1]}, {args[2]['contacts'][args[1]]['progress']}, {datetime.now()}")
 
     def email_action(*args):
-        print(f"Email action, {args[0]}, stage: {args[2]["contacts"][args[1]]["current_stage"]}, {args[1]}, {args[2]["contacts"][args[1]]["progress"]}, {datetime.now()}")
+        print(f"Email action, {args[0]}, stage: {args[2]['contacts'][args[1]]['current_stage']}, {args[1]}, {args[2]['contacts'][args[1]]['progress']}, {datetime.now()}")
 
     try:
         contacts = InputParser.load_contacts(contacts_file)

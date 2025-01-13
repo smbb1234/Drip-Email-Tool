@@ -1,13 +1,26 @@
+import logging
 import os
+import sys
+
+# Add the project root directory to sys.path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.join(current_dir, os.pardir)
+# print(f"Current path: {current_dir}")
+sys.path.append(project_root)
+
+# Switch working directory to "drip_email_tool"
+os.chdir(project_root)
+# print(f"Current working path: {os.getcwd()}")
+
 from src.modules import InputParser, CampaignManager, Scheduler, EmailSender, initialize_logger, log_event
 
 def main():
     # Load environment variables
     EMAIL_API_KEY = os.getenv("SENDGRID_API_KEY")
     DEFAULT_SENDER = os.getenv("DEFAULT_SENDER_EMAIL")
-    CONTACTS_FILE = "config/contacts.csv"
-    TEMPLATES_FILE = "config/templates.yaml"
-    SCHEDULE_FILE = "config/schedule.json"
+    CONTACTS_FILE = "data/contacts.csv"
+    TEMPLATES_FILE = "data/templates.yaml"
+    SCHEDULE_FILE = "data/schedule.json"
 
     # Define email sending action
     def send_email_action(
@@ -37,14 +50,14 @@ def main():
         )
 
         if success:
-            log_event(f"Email sent to {contact_email} for campaign {campaign_id}, stage {campaign_status["contacts"][contact_email]["current_stage"]}.",
+            log_event(f"Sent email to {contact_email} for {campaign_id}, stage {campaign_status['contacts'][contact_email]['current_stage']}.",
                       "INFO")
             campaign_manager.update_contact_campaign_status(campaign_id, contact_email, "Email Sent")
         else:
-            log_event(f"Failed to send email to {contact_email} for campaign {campaign_id}, stage {campaign_status["contacts"][contact_email]["current_stage"]}.",
+            log_event(f"Failed to send email to {contact_email} for campaign {campaign_id}, stage {campaign_status['contacts'][contact_email]['current_stage']}.",
                       "ERROR")
 
-    initialize_logger(os.getcwd()+"/logs")
+    initialize_logger(log_path=os.getcwd()+"/logs", log_level=logging.DEBUG)
     log_event("Starting the application...", "INFO")
 
     if not EMAIL_API_KEY:
