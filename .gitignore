@@ -17,5 +17,8 @@ app.log
 # API-KEY
 sendgrid.env
 
+# Guide Book
+Environment Configuration Guide.md
+
 # Temporary data files
 campaigns.json
