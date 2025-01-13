@@ -1,17 +1,21 @@
 # IDE directories
 .idea/
 
-# IDE directories
+# log directories
 .logs/
+
+# Temporary directories
+.temp/
+temp*/
 
 # Requirements report
 *.docx
 
 # Logs report
-/logs/app.log
+app.log
 
 # API-KEY
 sendgrid.env
 
 # Temporary data files
-campaign_state.json
+campaigns.json

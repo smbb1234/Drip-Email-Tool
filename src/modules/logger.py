@@ -3,7 +3,7 @@ import os
 from functools import wraps
 
 # Logger setup
-def initialize_logger(log_path: str = "../../logs", log_file: str = "app.log", log_level: int = logging.DEBUG) -> None:
+def initialize_logger(log_path: str = "logs/", log_file: str = "app.log", log_level: int = logging.DEBUG) -> None:
     """Initialize the logging configuration."""
     if not os.path.exists(log_path):
         os.makedirs(log_path)
