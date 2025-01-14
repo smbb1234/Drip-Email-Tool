@@ -11,89 +11,140 @@ class Scheduler:
         self.campaign_manager = campaign_manager
         self.scheduler = BackgroundScheduler()
 
-    def schedule_campaign(self, campaign_id: str, campaign_start_time: str, action: Callable) -> bool:
-        """Schedule a campaign to start at the specified time."""
+    def schedule_campaign(self, campaigns_name: str, campaign_id: str, action: Callable) -> bool:
+        """Schedule a campaign to start."""
         try:
-            start_datetime = datetime.fromisoformat(campaign_start_time)
-            if start_datetime <= datetime.now():
-                log_event(f"Start time for campaign {campaign_id} has already passed.", "WARNING")
+            if not self.campaign_manager.get_campaign(campaigns_name, campaign_id):
+                return False
+            if not self.campaign_manager.start_campaign(campaigns_name, campaign_id):
                 return False
 
-            log_event(f"Scheduling {campaign_id} to start at {campaign_start_time}.", "INFO")
+            current_stage, total_stage = self.campaign_manager.get_current_stage(campaigns_name, campaign_id)
+            sequence = self.campaign_manager.get_stage(campaigns_name, campaign_id, current_stage)
 
-            _contacts = self.campaign_manager.get_all_contacts(campaign_id)
-            for contact_email, _ in _contacts.items():
-                current_stage = self.campaign_manager.get_current_stage(campaign_id, contact_email)
-                if datetime.fromisoformat(current_stage["start_time"]) <= start_datetime:
-                    current_stage["start_time"] = start_datetime.isoformat()
+            start_time = self.campaign_manager.get_campaign_start_time(campaigns_name, campaign_id)
+            if self.schedule_time_exceeded(start_time):
+                log_event(
+                    f"Start time {datetime.isoformat(start_time)} for {campaigns_name} - {campaign_id} - {current_stage} has already passed. Update to current time",
+                    "WARNING")
+                start_time = datetime.now() + timedelta(seconds=5)
+                self.campaign_manager.update_stage_start_time(campaigns_name, campaign_id, current_stage, start_time)
 
-                self.scheduler.add_job(
-                    action,
-                    trigger=IntervalTrigger(
-                        days=current_stage["interval"],
-                        start_date=datetime.fromisoformat(current_stage["start_time"])
-                    ),
-                    args=[
-                        campaign_id,
-                        contact_email,
-                        self.campaign_manager.get_campaign_status(campaign_id)
-                    ],
-                    id=f"{campaign_id}_{contact_email}"
-                )
-                self.campaign_manager.update_contact_campaign_status(campaign_id, contact_email, "Pending")
+            log_event(f"Scheduling {campaigns_name} - {campaign_id} to start at {datetime.isoformat(start_time)}.",
+                      "INFO")
 
-            self.campaign_manager.start_campaign(campaign_id)
-            return True
-        except Exception as e:
-            log_event(f"Failed to schedule campaign {campaign_id}: {e}", "ERROR")
-            return False
-
-    def schedule_next_email(self, campaign_id: str, contact_email: str, action: Callable, delay: int = 0) -> bool:
-        """Schedule the next email of stage for a contact in a campaign."""
-        try:
-            current_campaign_contact = self.campaign_manager.get_contact_campaign_status(campaign_id, contact_email)
-
-            if not self.campaign_manager.move_to_next_stage(campaign_id, contact_email):
-                if not self.scheduler.get_job(f"{campaign_id}_{contact_email}"):
-                    log_event(f"Job for contact {contact_email} in campaign {campaign_id} not found during removal.", "WARNING")
-                    return False
-                self.scheduler.remove_job(f"{campaign_id}_{contact_email}")
-                self.campaign_manager.update_contact_campaign_status(campaign_id, contact_email, "Closed")
-                return False
-
-            current_campaign_stage = self.campaign_manager.get_current_stage(campaign_id, contact_email)
-            start_datetime = datetime.fromisoformat(
-                current_campaign_stage["start_time"]
-            )
-
-            if start_datetime <= datetime.now() + timedelta(days=delay):
-                current_campaign_stage["start_time"] = (datetime.now() + timedelta(days=delay)).isoformat()
-
-            log_event(f"Scheduling next email for {contact_email} in {campaign_id} in {delay} days. Current/Total: {current_campaign_contact['current_stage']}/{current_campaign_contact['total_stage']}. Start Time: {current_campaign_stage['start_time']}", "INFO")
-
-            if not self.scheduler.get_job(f"{campaign_id}_{contact_email}"):
-                log_event(f"Job for contact {contact_email} in campaign {campaign_id} not found during removal.", "WARNING")
-                return False
-            self.scheduler.remove_job(f"{campaign_id}_{contact_email}")
             self.scheduler.add_job(
                 action,
                 trigger=IntervalTrigger(
-                    days=current_campaign_stage["interval"],
-                    start_date=datetime.fromisoformat(current_campaign_stage["start_time"])
+                    days=sequence["interval"],
+                    start_date=datetime.fromisoformat(sequence["start_time"])
                 ),
                 args=[
-                    campaign_id,
-                    contact_email,
-                    self.campaign_manager.get_campaign_status(campaign_id)
+                    sequence["contacts"],
+                    sequence["template"],
+                    [campaigns_name, campaign_id, current_stage]
                 ],
-                id=f"{campaign_id}_{contact_email}"
+                id=f"{campaigns_name}_{campaign_id}_{current_stage}"
             )
-            self.campaign_manager.update_contact_campaign_status(campaign_id, contact_email, "Pending")
+
+            self.campaign_manager.update_stage_status(campaigns_name, campaign_id, current_stage, "In Progress")
+            return True
+        except Exception as e:
+            log_event(f"Failed to schedule {campaigns_name} - {campaign_id}: {e}", "ERROR")
+            return False
+
+    def schedule_next_stage(self, campaigns_name: str, campaign_id: str, action: Callable, delay: int = 0) -> bool:
+        """Schedule the next email of stage in a campaign."""
+        try:
+            if not self.campaign_manager.get_campaign(campaigns_name, campaign_id):
+                return False
+
+            current_stage, total_stage = self.campaign_manager.get_current_stage(campaigns_name, campaign_id)
+
+            if self.scheduler.get_job(f"{campaigns_name}_{campaign_id}_{current_stage}"):
+                self.scheduler.remove_job(f"{campaigns_name}_{campaign_id}_{current_stage}")
+
+            if not self.campaign_manager.move_to_next_stage(campaigns_name, campaign_id):
+                self.campaign_manager.update_stage_status(campaigns_name, campaign_id, current_stage, "Completed")
+                return False
+
+            current_stage, _ = self.campaign_manager.get_current_stage(campaigns_name, campaign_id)
+            start_time = self.campaign_manager.get_stage_start_time(campaigns_name, campaign_id, current_stage)
+            if self.schedule_time_exceeded(start_time):
+                log_event(f"Start time {datetime.isoformat(start_time)} for {campaigns_name} - {campaign_id} - {current_stage} has already passed. Update to current time", "WARNING")
+                start_time = datetime.now() + timedelta(seconds=5)
+                self.campaign_manager.update_stage_start_time(campaigns_name, campaign_id, current_stage, start_time)
+
+            log_event(f"Scheduling {campaigns_name} - {campaign_id} - {current_stage} to start at {datetime.isoformat(start_time)}. Total stage: {total_stage}.",
+                      "INFO")
+
+            sequence = self.campaign_manager.get_stage(campaigns_name, campaign_id, current_stage)
+
+            self.scheduler.add_job(
+                action,
+                trigger=IntervalTrigger(
+                    days=sequence["interval"],
+                    start_date=datetime.fromisoformat(sequence["start_time"])
+                ),
+                args=[
+                    sequence["contacts"],
+                    sequence["template"],
+                    [campaigns_name, campaign_id, current_stage]
+                ],
+                id=f"{campaigns_name}_{campaign_id}_{current_stage}"
+            )
+            self.campaign_manager.update_stage_status(campaigns_name, campaign_id, current_stage, "In Progress")
             return True
 
         except Exception as e:
-            log_event(f"Failed to schedule next email for {contact_email} in campaign {campaign_id}: {e}", "ERROR")
+            log_event(f"Failed to schedule next stage for {campaigns_name} - {campaign_id}: {e}", "ERROR")
             return False
+
+    def schedule_email(self, campaigns_name: str, campaign_id: str, stage: int, contact_email: str, action: Callable, delay: int = 0) -> bool:
+        """Schedule an email for a contact At a stage of a campaign."""
+        try:
+            designated_stage = self.campaign_manager.get_stage(campaigns_name, campaign_id, stage)
+            designated_contact = self.campaign_manager.get_contact(campaigns_name, campaign_id, stage, contact_email)
+
+            if not designated_stage:
+                return False
+            if not designated_contact:
+                return False
+
+            delay_timedelta = timedelta(days=delay)
+            start_datetime = delay_timedelta + datetime.fromisoformat(designated_stage["start_time"])
+
+            if self.schedule_time_exceeded(start_datetime):
+                log_event(f"Start time {datetime.isoformat(start_datetime)} for {contact_email} in {campaigns_name} - {campaign_id} - {stage} has already passed.", "WARNING")
+                return False
+
+            self.scheduler.add_job(
+                action,
+                trigger=IntervalTrigger(
+                    days=designated_stage["interval"],
+                    start_date=start_datetime
+                ),
+                args=[
+                    [{contact_email: designated_contact["info"]}],
+                    self.campaign_manager.get_stage_template(campaigns_name, campaign_id, stage)
+                ],
+                id=f"{campaigns_name}_{campaign_id}_{stage}_{contact_email}"
+            )
+
+            self.campaign_manager.update_contact_status(campaigns_name, campaign_id, stage, contact_email, "Pending")
+            return True
+
+        except Exception as e:
+            log_event(f"Failed to schedule email for {contact_email} in {campaigns_name} - {campaign_id} - {stage}: {e}", "ERROR")
+            return False
+
+    @staticmethod
+    def schedule_time_exceeded(input_time: datetime) -> bool:
+        """Check if the input time has already passed."""
+        if input_time <= datetime.now():
+            return True
+        return False
+
 
     def run_scheduler(self):
         """Run the scheduler."""
@@ -108,104 +159,44 @@ class Scheduler:
 if __name__ == "__main__":
     from src.modules import InputParser
     import os
+    from pathlib import Path
     from time import sleep
-    # from src.modules import initialize_logger
+    from src.modules import initialize_logger
 
-    # initialize_logger()
+    initialize_logger("../../logs/", "scheduler.log")
 
-    contacts_file = "../../data/contacts.csv"
-    templates_file = "../../data/templates.yaml"
-    schedule_file = "../../data/schedule.json"
+    def test_action(*args):
+        print(f"{datetime.now()}: {args}, ")
 
-    def start_action(*args):
-        print(f"Start action, {args[0]}, stage: {args[2]['contacts'][args[1]]['current_stage']},{args[1]}, {args[2]['contacts'][args[1]]['progress']}, {datetime.now()}")
-
-    def email_action(*args):
-        print(f"Email action, {args[0]}, stage: {args[2]['contacts'][args[1]]['current_stage']}, {args[1]}, {args[2]['contacts'][args[1]]['progress']}, {datetime.now()}")
+    def test_datetime(delay: int):
+        return datetime.now() + timedelta(seconds=delay)
 
     try:
-        contacts = InputParser.load_contacts(contacts_file)
-        templates = InputParser.load_templates(templates_file)
-        schedule = [
-          {
-            "campaign_id": "campaign_1",
-            "sequences": [
-              {
-                "sequence": 1,
-                "start_time": (datetime.now() + timedelta(seconds=1)).isoformat(),
-                "interval": 2
-              },
-              {
-                "sequence": 2,
-                "start_time": (datetime.now() + timedelta(seconds=2)).isoformat(),
-                "interval": 3
-              },
-                {
-                    "sequence": 3,
-                    "start_time": (datetime.now() + timedelta(seconds=3)).isoformat(),
-                    "interval": 4
-                }
-            ]
-          },
-            {
-                "campaign_id": "campaign_2",
-                "sequences": [
-                {
-                    "sequence": 1,
-                    "start_time": (datetime.now() + timedelta(seconds=1)).isoformat(),
-                    "interval": 2
-                },
-                {
-                    "sequence": 2,
-                    "start_time": (datetime.now() + timedelta(seconds=2)).isoformat(),
-                    "interval": 3
-                },
-                    {
-                        "sequence": 3,
-                        "start_time": (datetime.now() + timedelta(seconds=3)).isoformat(),
-                        "interval": 4
-                    }
-                ]
-            }
-        ]
-
         if os.path.exists("campaigns.json"):
             CampaignManager.delete_state("campaigns.json")
 
-        campaign_data = CampaignManager.build_campaign_data(contacts, templates, schedule)
-        manager = CampaignManager(campaign_data)
+        example_data = InputParser.build_campaign_data(Path("../../data/12-01-2025"))
+        manager = CampaignManager(example_data, "12-01-2025", "campaigns.json")
         scheduler = Scheduler(manager)
 
+        manager.campaigns_workflow["12-01-2025"]["campaign_1"][1]["start_time"] = test_datetime(5).isoformat()
+        manager.campaigns_workflow["12-01-2025"]["campaign_1"][2]["start_time"] = test_datetime(10).isoformat()
+        manager.campaigns_workflow["12-01-2025"]["campaign_3"][1]["start_time"] = test_datetime(2).isoformat()
+
         # Schedule campaign starts
-        for campaign in schedule:
-            scheduler.schedule_campaign(campaign["campaign_id"],
-                                        (datetime.now()+timedelta(seconds=1)).isoformat(),
-                                        start_action)
+        scheduler.schedule_campaign("12-01-2025", "campaign_1", test_action)
+        scheduler.schedule_campaign("12-01-2025", "campaign_3", test_action)
 
-        print(datetime.now())
+        print(f"Scheduler start at {datetime.now()}")
         scheduler.run_scheduler()
-
-        for campaign in schedule:
-            sleep(5)
-            for contact_email, _ in manager.get_all_contacts(campaign["campaign_id"]).items():
-                scheduler.schedule_next_email(campaign["campaign_id"],
-                                              contact_email,
-                                              email_action)
-                sleep(1)
-
         log_event("Scheduler running. Press Ctrl+C to exit.", "INFO")
         try:
             while True:
-                for campaign in schedule:
-                    sleep(7)
-                    for contact_email, _ in manager.get_all_contacts(campaign["campaign_id"]).items():
-                        scheduler.schedule_next_email(campaign["campaign_id"],
-                                                      contact_email,
-                                                      email_action)
-                        sleep(1)
+                sleep(7)
+                scheduler.schedule_next_stage("12-01-2025", "campaign_3", test_action)
+                if not scheduler.schedule_next_stage("12-01-2025", "campaign_1", test_action):
+                    break
 
-                if manager.completed_all_campaigns():
-                    raise 'All campaigns completed.'
         except (KeyboardInterrupt, SystemExit):
             raise KeyboardInterrupt
         finally:

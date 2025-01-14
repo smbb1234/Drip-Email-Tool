@@ -9,10 +9,29 @@ from src.modules import log_event
 from src.utils import Validator
 
 class InputParser:
-    """Utility class for parsing input data."""
+    """
+    Utility class for parsing input data. This class provides static methods to:
+    1. Load and validate contact data from CSV files.
+    2. Load email templates from YAML files.
+    3. Load campaign schedules from JSON files.
+    4. Extract placeholders from email templates.
+    5. Build structured campaign data by combining schedules, templates, and contacts.
+    """
     @staticmethod
     def load_contacts(file_path: Path) -> List[Dict]:
-        """Load and validate contacts from a CSV file."""
+        """
+        Load and validate contacts from a CSV file.
+
+        Args:
+            file_path (Path): Path to the CSV file containing contact information.
+
+        Returns:
+            List[Dict]: A list of dictionaries, each representing a contact.
+
+        Raises:
+            FileNotFoundError: If the file does not exist.
+            ValueError: If the file cannot be read or is missing required columns.
+        """
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Contacts file not found: {file_path}")
 
@@ -38,7 +57,19 @@ class InputParser:
 
     @staticmethod
     def load_templates(file_path: Path) -> List[Dict]:
-        """Load email templates from a YAML file."""
+        """
+        Load email templates from a YAML file.
+
+        Args:
+            file_path (Path): Path to the YAML file containing templates.
+
+        Returns:
+            List[Dict]: A list of dictionaries, each representing a template.
+
+        Raises:
+            FileNotFoundError: If the file does not exist.
+            ValueError: If the file cannot be read, is not a list, or is missing required keys.
+        """
         required_keys = {"sequence", "subject", "content"} # Required keys for each template
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Templates file not found: {file_path}")
@@ -62,7 +93,19 @@ class InputParser:
 
     @staticmethod
     def load_schedule(file_path: Path) -> List[Dict]:
-        """Load campaign schedules from a JSON file."""
+        """
+        Load campaign schedules from a JSON file.
+
+        Args:
+            file_path (Path): Path to the JSON file containing schedules.
+
+        Returns:
+            List[Dict]: A list of dictionaries, each representing a campaign schedule.
+
+        Raises:
+            FileNotFoundError: If the file does not exist.
+            ValueError: If the file cannot be read, is not a list, or is missing required keys.
+        """
         required_keys = {"campaign_id", "sequences"} # Required keys for each campaign
         if not os.path.exists(file_path):
             raise FileNotFoundError(f"Schedule file not found: {file_path}")
@@ -88,15 +131,32 @@ class InputParser:
     def extract_placeholders(template_content: str) -> List[str]:
         """
         Extract placeholders in templates
-        For example: Hi {name}, your {topic} -> ['name', 'topic']
+        Args:
+            template_content (str): Content containing placeholders in {placeholder} format.
+
+        Returns:
+            List[str]: A list of placeholder names.
+
+        For example:
+        Hi {name}, your {topic} -> ['name', 'topic']
         """
         return re.findall(r"\{(.*?)}", template_content)
 
     @staticmethod
     def build_campaign_data(base_path: Path) -> Dict:
         """
-        Parse schedule.json and templates.yaml in the directory, dynamically associate sequence with template, and record placeholders.
-        Load the contacts into the corresponding campaign and sequence
+        Parse schedule.json and templates.yaml in the directory, associate sequences with templates,
+        and record placeholders. Also, load contacts into the corresponding campaign and sequence.
+
+        Args:
+            base_path (Path): Path to the base directory containing campaign data.
+
+        Returns:
+            Dict: A dictionary representing the structured campaign data.
+
+        Raises:
+            FileNotFoundError: If schedule or template files are missing.
+            ValueError: If required data is invalid or incomplete.
         """
         schedule_file = base_path / "schedule.json"
 
@@ -142,7 +202,7 @@ class InputParser:
                             **value,
                             "progress": "Not Started"
                         }
-                        for contact, value in campaigns_data[campaign_id][sequence_id - 1]["contacts"].items()
+                        for contact, value in campaigns_data[campaign_id][str(sequence_id - 1)]["contacts"].items()
                     }
                 else:
                     contacts = InputParser.load_contacts(contacts_path)
@@ -160,7 +220,7 @@ class InputParser:
                 template = sequence_template_mapping.get(sequence_id)
 
                 if template:
-                    campaigns_data[campaign_id][sequence_id] = {
+                    campaigns_data[campaign_id][str(sequence_id)] = {
                         "sequence_status": "Not Started",
                         "start_time": seq['start_time'],
                         "interval": seq['interval'],

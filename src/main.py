@@ -1,6 +1,10 @@
 import logging
 import os
 import sys
+from pathlib import Path
+from time import sleep
+from typing import List, Dict
+from src.modules import InputParser, CampaignManager, Scheduler, EmailSender, initialize_logger, log_event
 
 # Add the project root directory to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -12,105 +16,130 @@ sys.path.append(project_root)
 os.chdir(project_root)
 # print(f"Current working path: {os.getcwd()}")
 
-from src.modules import InputParser, CampaignManager, Scheduler, EmailSender, initialize_logger, log_event
-
 def main():
-    # Load environment variables
-    EMAIL_API_KEY = os.getenv("SENDGRID_API_KEY")
-    DEFAULT_SENDER = os.getenv("DEFAULT_SENDER_EMAIL")
-    CONTACTS_FILE = "data/contacts.csv"
-    TEMPLATES_FILE = "data/templates.yaml"
-    SCHEDULE_FILE = "data/schedule.json"
+
+    data_directory = Path("data/")
+    load_file = False
+    store_file = "src/campaigns.json"
+
+    DEFAULT_SENDER = "ramya@DiagonalMatrix.com"
+
+    # Get all schedules directory
+    schedules_directory = []
+    items = os.listdir(data_directory)
+    for item in items:
+        item_path = data_directory / item
+        if os.path.isdir(item_path):
+            schedules_directory.append(str(item_path))
 
     # Define email sending action
     def send_email_action(
-            campaign_id,
-            contact_email,
-            campaign_status,
-            campaign_manager : CampaignManager = None,
+            contacts: Dict,
+            template: Dict,
+            campaign_info: list[str],
+            custom_vars: Dict = None,
+            campaign_manager: CampaignManager = None,
             email_sender : EmailSender = None
     ):
-        if not email_sender or not campaign_manager:
-            log_event(f"{campaign_id} - {contact_email}, Email sender or Campaign manager is not configured.", "ERROR")
+        if not campaign_manager:
+            log_event(f"Campaign manager is not configured.", "ERROR")
+            return False
+        if not email_sender:
+            log_event(f"Email sender is not configured.", "ERROR")
             return False
 
-        subject, content = EmailSender.build_email_content(
-            campaign_template=campaign_manager.get_current_stage_template(campaign_id,
-                                           campaign_status["contacts"][contact_email]["current_stage"]),
-            contact=campaign_manager.get_contact_campaign_status(campaign_id, contact_email),
-            custom_vars={}
-        )
-        log_event(f"Email has been generated and ready to be sent...", "INFO")
+        campaigns_name, campaign_id, current_stage = campaign_info
 
-        success = email_sender.send_email(
-            recipient=contact_email,
-            subject=subject,
-            content=content,
-            sender=DEFAULT_SENDER
-        )
+        for contact_email, info in contacts.items():
+            subject, content = EmailSender.build_email_content(
+                campaign_template=template,
+                contact_info=info,
+                custom_vars=custom_vars
+            )
+            log_event(f"Email has been generated and ready to be sent...", "INFO")
 
-        if success:
-            log_event(f"Sent email to {contact_email} for {campaign_id}, stage {campaign_status['contacts'][contact_email]['current_stage']}.",
-                      "INFO")
-            campaign_manager.update_contact_campaign_status(campaign_id, contact_email, "Email Sent")
-        else:
-            log_event(f"Failed to send email to {contact_email} for campaign {campaign_id}, stage {campaign_status['contacts'][contact_email]['current_stage']}.",
-                      "ERROR")
+            success = email_sender.send_email(
+                recipients=[contact_email],
+                subject=subject,
+                content=content
+            )
+            # print([[contact_email],subject,content])
+            # success = True
 
-    initialize_logger(log_path=os.getcwd()+"/logs", log_level=logging.DEBUG)
+            if success:
+                log_event(
+                    f"Sent email to {contact_email} for {campaigns_name} - {campaign_id}, stage {current_stage}.",
+                    "INFO")
+                campaign_manager.update_contact_status(
+                    campaigns_name,
+                    campaign_id,
+                    int(current_stage),
+                    contact_email,
+                    "Email Sent"
+                )
+            else:
+                log_event(
+                    f"Failed to send email to {contact_email} for {campaigns_name} - {campaign_id}, stage {current_stage}.",
+                    "ERROR")
+
+    initialize_logger(log_path=os.getcwd()+"/logs", log_level=logging.WARNING)
     log_event("Starting the application...", "INFO")
-
-    if not EMAIL_API_KEY:
-        log_event("SendGrid API key is not configured.", "ERROR")
-        return
-
-    if not DEFAULT_SENDER:
-        log_event("Default sender email is not configured.", "ERROR")
-        return
 
     # Initialize EmailSender
     email_sender = EmailSender(DEFAULT_SENDER)
 
     # Load campaign data
     try:
-        contacts = InputParser.load_contacts(CONTACTS_FILE)
-        templates = InputParser.load_templates(TEMPLATES_FILE)
-        schedule = InputParser.load_schedule(SCHEDULE_FILE)
+        if not load_file and os.path.exists("src/campaigns.json"):
+            CampaignManager.delete_state("src/campaigns.json")
 
-        campaign_data = CampaignManager.build_campaign_data(
-            contacts,
-            templates,
-            schedule
-        )
-        campaign_manager = CampaignManager(campaign_data)
+        campaigns_path, campaigns_name = os.path.split(schedules_directory[0])
+
+        campaign_data = InputParser.build_campaign_data(Path(schedules_directory[0]))
+        campaign_manager = CampaignManager(campaign_data, campaigns_name, load_file, store_file)
         scheduler = Scheduler(campaign_manager)
 
         # Schedule campaigns
-        for campaign_id, campaign in campaign_manager.campaigns.items():
+        for campaign_id, campaign in campaign_manager.get_campaigns(campaigns_name).items():
             scheduler.schedule_campaign(
+                campaigns_name=campaigns_name,
                 campaign_id=campaign_id,
-                campaign_start_time=campaign["schedule"][0]["start_time"],
-                action=lambda cid, email, status: send_email_action(cid, email, status, campaign_manager, email_sender)
+                action=lambda contacts, template, campaign_info: send_email_action(
+                    contacts,
+                    template,
+                    campaign_info,
+                    custom_vars={"topic": "Future"},
+                    campaign_manager=campaign_manager,
+                    email_sender=email_sender
+                )
             )
 
         log_event("Scheduler running. Press Ctrl+C to exit.", "INFO")
+
         try:
             scheduler.run_scheduler()
             while True:
-                for campaign_id, campaign in campaign_manager.campaigns.items():
-                    for contact_email, contact in campaign["contacts"].items():
-                        if contact["progress"] not in {
-                            "Email Sent",
-                            "Reply Received"
-                        }:
+                sleep(10)
+                for campaign_id, campaign in campaign_manager.get_campaigns(campaigns_name).items():
+                    current_stage, _ = campaign_manager.get_current_stage(campaigns_name, campaign_id)
+                    if campaign_manager.completed_stage(campaigns_name, campaign_id, current_stage):
+                        if not campaign_manager.completed_campaign(campaigns_name, campaign_id):
+                            scheduler.schedule_next_stage(
+                                campaigns_name=campaigns_name,
+                                campaign_id=campaign_id,
+                                action=lambda contacts, template, campaign_info: send_email_action(
+                                    contacts,
+                                    template,
+                                    campaign_info,
+                                    custom_vars={"topic": "Future"},
+                                    campaign_manager=campaign_manager,
+                                    email_sender=email_sender
+                                )
+                            )
                             continue
-                        scheduler.schedule_next_email(
-                            campaign_id=campaign_id,
-                            contact_email=contact_email,
-                            action=lambda cid, email, status: send_email_action(cid, email, status, campaign_manager, email_sender)
-                        )
+                        continue
 
-                if campaign_manager.completed_all_campaigns():
+                if campaign_manager.completed_all_campaigns(campaigns_name):
                     raise 'All campaigns completed.'
         except (KeyboardInterrupt, SystemExit):
             raise KeyboardInterrupt

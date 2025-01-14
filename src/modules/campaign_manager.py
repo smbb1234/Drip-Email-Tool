@@ -10,13 +10,16 @@ class CampaignManager:
     CONTACT_ALLOWED_STATUSES = {"Not Started", "Pending", "Email Sent", "Reply Received", "Closed"}
     CAMPAIGN_ALLOWED_STATUSES = {"Not Started", "In Progress", "Completed"}
 
-    def __init__(self, campaign_data: Dict, campaigns_name: str = datetime.now().strftime("%d-%m-%Y"), store_file: str = f"src/campaigns.json"):
+    def __init__(self, campaign_data: Dict, campaigns_name: str = datetime.now().strftime("%d-%m-%Y"), load_file: bool = False, store_file: str = f"src/campaigns.json"):
         """Initialize the campaign manager."""
         self.campaigns_workflow = {}
         self.store_file = Path(store_file)
 
         # Create a new CampaignManager instance from a store file.
-        if campaign_data is None and os.path.exists(self.store_file):
+        if campaign_data is None or load_file:
+            if not os.path.exists(self.store_file):
+                log_event("Campaign store file not found.", "ERROR")
+                return
             self.campaigns_workflow = Utils.load_json_file(self.store_file)
             log_event("Campaign state file loaded successfully.", "INFO")
             return
@@ -49,7 +52,7 @@ class CampaignManager:
             log_event(f"Campaigns {campaigns_name} does not exist.", "ERROR")
             return {}
 
-        log_event("Retrieved campaigns for {campaigns_name}.", "INFO")
+        log_event(f"Retrieved campaigns for {campaigns_name}.", "INFO")
         return self.campaigns_workflow[campaigns_name]
 
     def del_campaigns(self, campaigns_name: str) -> bool:
@@ -88,8 +91,9 @@ class CampaignManager:
             log_event(f"Invalid status '{status}' for campaign {campaigns_name} - {campaign_id}. Allowed statuses: {self.CAMPAIGN_ALLOWED_STATUSES}.", "ERROR")
             return False
 
-        self.campaigns_workflow[campaigns_name][campaign_id]["campaign_status"] = status
-        self.save_state()
+        if self.campaigns_workflow[campaigns_name][campaign_id]["campaign_status"] != status:
+            self.campaigns_workflow[campaigns_name][campaign_id]["campaign_status"] = status
+            self.save_state()
 
         log_event(f"Updated campaign {campaign_id} to status: {status}.", "INFO")
         return True
@@ -102,12 +106,12 @@ class CampaignManager:
         if campaign_id not in self.campaigns_workflow[campaigns_name]:
             log_event(f"Campaign: {campaigns_name} - {campaign_id} does not exist.", "ERROR")
             return {}
-        if stage not in self.campaigns_workflow[campaigns_name][campaign_id]:
+        if str(stage) not in self.campaigns_workflow[campaigns_name][campaign_id]:
             log_event(f"Stage {stage} is out of range for campaign {campaigns_name} - {campaign_id}.", "ERROR")
             return {}
 
         log_event(f"Retrieved data for stage {stage} in {campaigns_name} - {campaign_id}.", "INFO")
-        return self.campaigns_workflow[campaigns_name][campaign_id][stage]
+        return self.campaigns_workflow[campaigns_name][campaign_id][str(stage)]
 
     def update_stage_status(self, campaigns_name: str, campaign_id: str, stage: int, status: str) -> bool:
         """Update the status of the stage."""
@@ -117,7 +121,7 @@ class CampaignManager:
         if campaign_id not in self.campaigns_workflow[campaigns_name]:
             log_event(f"Campaign: {campaigns_name} - {campaign_id} does not exist.", "ERROR")
             return False
-        if stage not in self.campaigns_workflow[campaigns_name][campaign_id]:
+        if str(stage) not in self.campaigns_workflow[campaigns_name][campaign_id]:
             log_event(f"Stage {stage} is out of range for campaign {campaigns_name} - {campaign_id}.", "ERROR")
             return False
 
@@ -125,8 +129,9 @@ class CampaignManager:
             log_event(f"Invalid status '{status}' for stage {stage} in campaign {campaigns_name} - {campaign_id}. Allowed statuses: {self.CAMPAIGN_ALLOWED_STATUSES}.", "ERROR")
             return False
 
-        self.campaigns_workflow[campaigns_name][campaign_id][stage]["sequence_status"] = status
-        self.save_state()
+        if self.campaigns_workflow[campaigns_name][campaign_id][str(stage)]["sequence_status"] != status:
+            self.campaigns_workflow[campaigns_name][campaign_id][str(stage)]["sequence_status"] = status
+            self.save_state()
 
         log_event(f"Updated stage {stage} in {campaigns_name} - {campaign_id} to status: {status}.", "INFO")
         return True
@@ -160,14 +165,15 @@ class CampaignManager:
             log_event(f"Invalid status '{status}' for contact {contact_email} in stage {stage} of campaign {campaigns_name} - {campaign_id}. Allowed statuses: {self.CONTACT_ALLOWED_STATUSES}.", "ERROR")
             return False
 
-        sequence["contacts"][contact_email]["progress"] = status
-        self.save_state()
+        if sequence["contacts"][contact_email]["progress"] != status:
+            sequence["contacts"][contact_email]["progress"] = status
+            self.save_state()
 
         log_event(f"Updated contact {contact_email} in stage {stage} of {campaigns_name} - {campaign_id} to status: {status}.", "INFO")
         return True
 
     def get_current_stage(self, campaigns_name: str, campaign_id: str):
-        """Get the current stage of a contact in a campaign."""
+        """Get the current stage and total stage of the campaign."""
         campaign = self.get_campaign(campaigns_name, campaign_id)
 
         if not campaign:
@@ -179,10 +185,12 @@ class CampaignManager:
             return 1, total_stage
 
         for sequence_id in range(total_stage, 0, -1):
-            if campaign[sequence_id]["sequence_status"] != "Not Started":
+            if campaign[str(sequence_id)]["sequence_status"] != "Not Started":
                 return sequence_id, total_stage
 
-    def get_current_stage_template(self, campaigns_name: str, campaign_id: str, stage: int) -> Dict:
+        return total_stage, total_stage
+
+    def get_stage_template(self, campaigns_name: str, campaign_id: str, stage: int) -> Dict:
         """Get the template for the current stage of a campaign."""
         sequence = self.get_stage(campaigns_name, campaign_id, stage)
 
@@ -206,6 +214,18 @@ class CampaignManager:
             return None
 
         return datetime.fromisoformat(sequence["start_time"])
+
+    def update_stage_start_time(self, campaigns_name: str, campaign_id: str, stage: int, new_time: datetime) -> bool:
+        """Update the start time for the stage."""
+        sequence = self.get_stage(campaigns_name, campaign_id, stage)
+
+        if not sequence:
+            return False
+
+        sequence["start_time"] = new_time.isoformat()
+        self.save_state()
+        log_event(f"Updated start time for stage {stage} in {campaigns_name} - {campaign_id}.", "INFO")
+        return True
 
     def get_stage_interval(self, campaigns_name: str, campaign_id: str, stage: int) -> int:
         """Get the interval for the stage."""
@@ -329,7 +349,7 @@ class CampaignManager:
         if not campaigns:
             return False
 
-        for _, campaign_id in campaigns.items():
+        for campaign_id, _ in campaigns.items():
             campaign = self.get_campaign(campaigns_name, campaign_id)
             if campaign["campaign_status"] != "Completed":
                 return False
@@ -356,34 +376,45 @@ if __name__ == "__main__":
     # from src.modules import initialize_logger
     # initialize_logger()
 
-    if os.path.exists("campaigns.json"):
+    load_file = False
+    if not load_file and os.path.exists("campaigns.json"):
         CampaignManager.delete_state("campaigns.json")
 
     from src.modules import InputParser
-    example_campaigns1 = InputParser.build_campaign_data(Path("../../data/12-01-2025"))
-    manager = CampaignManager(example_campaigns1, "12-01-2025", "campaigns.json")
 
-    example_campaigns2 = InputParser.build_campaign_data(Path("../../data/12-01-2025"))
+    data_directory = Path("../../data")
+    schedules_directory = []
+    items = os.listdir(data_directory)
+    for item in items:
+        item_path = data_directory / item
+        if os.path.isdir(item_path):
+            schedules_directory.append(str(item_path))
+
+    campaigns_path, campaigns_name = os.path.split(schedules_directory[0])
+    example_campaigns1 = InputParser.build_campaign_data(Path(schedules_directory[0]))
+    manager = CampaignManager(example_campaigns1, campaigns_name, load_file, "campaigns.json")
+
+    example_campaigns2 = InputParser.build_campaign_data(Path(schedules_directory[0]))
     print(manager.add_campaigns(example_campaigns2, "12-02-2025"))
 
-    print(manager.get_campaigns("12-01-2025"))
-    print(manager.get_campaign("12-01-2025", "campaign_1"))
-    print(manager.get_stage("12-01-2025", "campaign_1", 1))
-    print(manager.get_contact("12-01-2025", "campaign_1", 1, "john.doe@example.com"))
+    print(manager.get_campaigns(campaigns_name))
+    print(manager.get_campaign(campaigns_name, "campaign_1"))
+    print(manager.get_stage(campaigns_name, "campaign_1", 1))
+    print(manager.get_contact(campaigns_name, "campaign_1", 1, "john.doe@example.com"))
 
-    print(manager.get_current_stage("12-01-2025", "campaign_1"))
-    print(manager.start_campaign("12-01-2025", "campaign_1"))
-    print(manager.get_campaign("12-01-2025", "campaign_1"))
+    print(manager.get_current_stage(campaigns_name, "campaign_1"))
+    print(manager.start_campaign(campaigns_name, "campaign_1"))
+    print(manager.get_campaign(campaigns_name, "campaign_1"))
 
-    print(manager.move_to_next_stage("12-01-2025", "campaign_1"))
-    print(manager.get_current_stage("12-01-2025", "campaign_1"))
-    print(manager.get_current_stage_template("12-01-2025", "campaign_1", 2))
-    print(manager.get_stage_start_time("12-01-2025", "campaign_1", 2))
-    print(manager.get_stage_interval("12-01-2025", "campaign_1", 2))
-    print(manager.is_end_of_stage("12-01-2025", "campaign_1"))
-    print(manager.move_to_next_stage("12-01-2025", "campaign_1"))
-    print(manager.get_current_stage("12-01-2025", "campaign_1"))
+    print(manager.move_to_next_stage(campaigns_name, "campaign_1"))
+    print(manager.get_current_stage(campaigns_name, "campaign_1"))
+    print(manager.get_stage_template(campaigns_name, "campaign_1", 2))
+    print(manager.get_stage_start_time(campaigns_name, "campaign_1", 2))
+    print(manager.get_stage_interval(campaigns_name, "campaign_1", 2))
+    print(manager.is_end_of_stage(campaigns_name, "campaign_1"))
+    print(manager.move_to_next_stage(campaigns_name, "campaign_1"))
+    print(manager.get_current_stage(campaigns_name, "campaign_1"))
 
-    print(manager.update_stage_status("12-01-2025", "campaign_1", 1, "Completed"))
-    print(manager.update_stage_status("12-01-2025", "campaign_1", 2, "Completed"))
-    print(manager.completed_campaign("12-01-2025", "campaign_1"))
+    print(manager.update_stage_status(campaigns_name, "campaign_1", 1, "Completed"))
+    print(manager.update_stage_status(campaigns_name, "campaign_1", 2, "Completed"))
+    print(manager.completed_campaign(campaigns_name, "campaign_1"))
