@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from time import sleep
 from typing import Dict
-from src.modules import InputParser, CampaignManager, Scheduler, EmailSender, initialize_logger, log_event
+
 
 # Add the project root directory to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -13,6 +13,8 @@ sys.path.append(project_root)
 
 # Switch working directory to "drip_email_tool"
 os.chdir(project_root)
+
+from src.modules import InputParser, CampaignManager, Scheduler, EmailSender, initialize_logger, log_event
 
 # Define email sending action
 def send_email_action(
@@ -40,13 +42,13 @@ def send_email_action(
         )
         log_event(f"Email has been generated and ready to be sent...", "INFO")
 
-        success = email_sender.send_email(
-            recipients=[contact_email],
-            subject=subject,
-            content=content
-        )
-        # print([[contact_email],subject,content])
-        # success = True
+        # success = email_sender.send_email(
+        #     recipients=[contact_email],
+        #     subject=subject,
+        #     content=content
+        # )
+        print([[contact_email],subject,content])
+        success = True
 
         if success:
             log_event(
@@ -114,8 +116,10 @@ def main():
             )
 
         log_event("Scheduler running. Press Ctrl+C to exit.", "INFO")
+        print("Scheduler running. Press Ctrl+C to exit.")
 
         scheduler.run_scheduler()
+
         while True:
             sleep(10)
             for campaign_id, campaign in campaign_manager.get_campaigns(campaigns_name).items():
@@ -138,14 +142,14 @@ def main():
                     continue
 
             if campaign_manager.completed_all_campaigns(campaigns_name):
-                raise 'All campaigns completed.'
+                raise Exception("All campaigns have been completed.")
 
     except (KeyboardInterrupt, SystemExit):
         raise KeyboardInterrupt
     except Exception as e:
-        log_event(f"Error loading campaign data: {e}", "ERROR")
+        log_event(f"An error occurred: {e}", "ERROR")
     finally:
-        if not scheduler:
+        if scheduler:
             scheduler.shutdown_scheduler()
         exit(1)
 
