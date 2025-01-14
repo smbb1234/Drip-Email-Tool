@@ -140,11 +140,11 @@ if __name__ == "__main__":
     from pathlib import Path
 
     try:
-        example_campaigns = InputParser.build_campaign_data(Path("../../data/12-01-2025"))
-        manager = CampaignManager(example_campaigns, "12-01-2025", "campaigns.json")
+        example_data = InputParser.build_campaign_data(Path("../../data/12-01-2025"))
+        manager = CampaignManager(example_data, "12-01-2025", "campaigns.json")
 
         target_user = manager.get_contact("12-01-2025", "campaign_1", 1,"john.doe@example.com")
-        target_template = manager.get_current_stage_template("12-01-2025", "campaign_1", 1)
+        target_template = manager.get_stage_template("12-01-2025", "campaign_1", 1)
 
         subject, content = EmailSender.build_email_content(
             target_template,
@@ -162,9 +162,7 @@ if __name__ == "__main__":
         # content = "<h1>Hello!</h1><p>Thank you for signing up.</p>"
 
         recipients = [
-            "peter_926@aliyun.com",
-            "peter_926@live.cn",
-            "jbl1990926@gmail.com"
+            "john.doe@example.com"
         ]
         success = email_sender.send_email(recipients, subject, content)
 
