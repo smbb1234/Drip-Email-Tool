@@ -2,11 +2,12 @@ from watchdog.events import FileSystemEventHandler
 from src.modules import log_event
 from src.utils import Validator
 from pathlib import Path
-from typing import Union
+from typing import Union, Callable
+
 
 # Data folder monitoring processor
 class DataFolderHandler(FileSystemEventHandler):
-    def __init__(self, process_callback):
+    def __init__(self, process_callback: Callable):
         self.process_callback = process_callback  # Methods for processing directories that meet the conditions
 
     def on_created(self, event):

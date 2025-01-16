@@ -1,5 +1,4 @@
 import json
-import os
 from pathlib import Path
 
 class Utils:
@@ -7,7 +6,7 @@ class Utils:
     @staticmethod
     def load_json_file(file_path: Path):
         """Load a JSON file and return its content."""
-        if not os.path.exists(file_path):
+        if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
 
         with open(file_path, "r") as f:
