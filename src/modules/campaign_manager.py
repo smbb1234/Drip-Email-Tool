@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Union
 from src.modules import log_event
 from src.utils import Utils
 
@@ -363,10 +363,11 @@ class CampaignManager:
         log_event("Saved campaign state to file.", "INFO")
 
     @staticmethod
-    def delete_state(store_file: str):
+    def delete_state(store_file: Union[str, Path]):
         """Delete the state file."""
-        if os.path.exists(store_file):
-            os.remove(store_file)
+        store_file = Path(store_file)
+        if store_file.exists():
+            store_file.unlink()
             log_event("Deleted campaign state file.", "INFO")
         else:
             log_event("Campaign state file not found.", "WARNING")
