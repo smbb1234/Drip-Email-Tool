@@ -1,18 +1,16 @@
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 from typing import List
+from config import config
 from src.modules import log_event
 from src.utils import Validator
 
 class EmailSender:
     """Class to handle sending emails using SendGrid."""
 
-    def __init__(self, sender_email: str):
+    def __init__(self):
         """Initialize the EmailSender with sender's email address."""
-        self.AWS_REGION = "eu-west-2"
-        self.client = boto3.client('ses', region_name=self.AWS_REGION)
-        self.sender_email = sender_email
-        self.CHARSET = "UTF-8"
+        self.client = boto3.client('ses', region_name=config.AWS_REGION)
 
     def send_email(self, recipients: List[str], subject: str, content: str, sender: str = None) -> bool:
         """Send an email using SendGrid.
@@ -27,7 +25,7 @@ class EmailSender:
             bool: True if the email is sent successfully, False otherwise.
         """
         try:
-            sender = sender or self.sender_email
+            sender = sender or config.SENDER_EMAIL
             if not sender:
                 log_event("Sender email is not configured.", "ERROR")
                 return False
@@ -48,16 +46,16 @@ class EmailSender:
                 Message={
                     'Body': {
                         'Html': {
-                            'Charset': self.CHARSET,
+                            'Charset': config.CHARSET,
                             'Data': content,
                         },
                         'Text': {
-                            'Charset': self.CHARSET,
+                            'Charset': config.CHARSET,
                             'Data': content,
                         },
                     },
                     'Subject': {
-                        'Charset': self.CHARSET,
+                        'Charset': config.CHARSET,
                         'Data': subject,
                     },
                 },
@@ -83,25 +81,13 @@ class EmailSender:
             log_event(f"An error occurred: {e}", "ERROR")
             return False
 
-    # def get_email_states(self, params: dict):
-    #
-    #     try:
-    #         response = self.client.client.stats.get(query_params=params)
-    #         if response.status_code == 200:
-    #             return response.to_dict
-    #         else:
-    #             log_event(f"Failed to fetch metrics: {response.status_code}, {response.text}", "ERROR")
-    #     except Exception as e:
-    #         log_event(f"An error occurred while fetching email metrics: {e}", "ERROR")
-
     @staticmethod
-    def build_email_content(campaign_template: dict, contact_info: dict, custom_vars: dict = None) -> (str, str):
+    def build_email_content(campaign_template: dict, contact_info: dict) -> (str, str):
         """Generate email content using a template and contact details.
 
         Args:
             campaign_template (dict): The template containing placeholders.
             contact_info (dict): The contact details to fill in the placeholders.
-            custom_vars (dict, optional): Additional custom variables for placeholder replacement. Defaults to None.
 
         Returns:
             str: The generated email subject and content.
@@ -109,7 +95,7 @@ class EmailSender:
         try:
             _subject = campaign_template["subject"]
             _content = campaign_template["content"]
-            custom_vars = custom_vars or {}
+            custom_vars = config.CUSTOM_VAR
 
             if not _subject or not _content:
                 log_event("Subject or content not found in template.", "ERROR")
@@ -141,20 +127,16 @@ if __name__ == "__main__":
 
     try:
         example_data = InputParser.build_campaign_data(Path("../../data/12-01-2025"))
-        manager = CampaignManager(example_data, "12-01-2025", "campaigns.json")
+        manager = CampaignManager(example_data, "12-01-2025")
 
         target_user = manager.get_contact("12-01-2025", "campaign_1", 1,"john.doe@example.com")
         target_template = manager.get_stage_template("12-01-2025", "campaign_1", 1)
 
-        subject, content = EmailSender.build_email_content(
-            target_template,
-            target_user,
-            {"topic": "Future"}
-        )
+        subject, content = EmailSender.build_email_content(target_template, target_user)
 
         print(f"Subject: {subject}\nContent: {content}")
 
-        email_sender = EmailSender("ramya@DiagonalMatrix.com")
+        email_sender = EmailSender()
 
         # Example email details
         # recipient_email = "jbl1990926@gmail.com"

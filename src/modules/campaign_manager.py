@@ -1,7 +1,8 @@
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Union
+from config import config
 from src.modules import log_event
 from src.utils import Utils
 
@@ -10,19 +11,21 @@ class CampaignManager:
     CONTACT_ALLOWED_STATUSES = {"Not Started", "Pending", "Email Sent", "Reply Received", "Closed"}
     CAMPAIGN_ALLOWED_STATUSES = {"Not Started", "In Progress", "Completed"}
 
-    def __init__(self, campaign_data: Dict, campaigns_name: str = datetime.now().strftime("%d-%m-%Y"), load_file: bool = False, store_file: str = f"src/campaigns.json"):
+    def __init__(self, campaign_data: Dict = None, campaigns_name: str = datetime.now().strftime("%d-%m-%Y"), file_persistence: bool = config.FILE_PERSISTENCE, store_file: str = config.CAMPAIGN_PATH):
         """Initialize the campaign manager."""
         self.campaigns_workflow = {}
+        self.load_file = file_persistence
         self.store_file = Path(store_file)
 
         # Create a new CampaignManager instance from a store file.
-        if campaign_data is None or load_file:
-            if not os.path.exists(self.store_file):
-                log_event("Campaign store file not found.", "ERROR")
+        if self.store_file.exists():
+            if self.load_file:
+                self.campaigns_workflow = Utils.load_json_file(self.store_file)
+                log_event("Campaign state file loaded successfully.", "INFO")
                 return
-            self.campaigns_workflow = Utils.load_json_file(self.store_file)
-            log_event("Campaign state file loaded successfully.", "INFO")
-            return
+            else:
+                self.store_file.unlink()
+        log_event("Campaign store file not found.", "WARNING")
 
         if campaign_data is not None:
             self.campaigns_workflow = {
@@ -33,7 +36,7 @@ class CampaignManager:
             self.save_state()
             return
 
-        log_event("Failed to initialize CampaignManager instance.", "ERROR")
+        log_event("Please add campaigns manually", "WARNING")
 
     def add_campaigns(self, campaigns_data: Dict, campaigns_name: str = datetime.now().strftime("%d-%m-%Y")) -> bool:
         """Add new campaigns to the manager."""
@@ -222,7 +225,7 @@ class CampaignManager:
         if not sequence:
             return False
 
-        sequence["start_time"] = new_time.isoformat()
+        sequence["start_time"] = new_time.isoformat(timespec='seconds')
         self.save_state()
         log_event(f"Updated start time for stage {stage} in {campaigns_name} - {campaign_id}.", "INFO")
         return True
@@ -359,14 +362,16 @@ class CampaignManager:
 
     def save_state(self):
         """Save the current campaign state to the state file."""
-        Utils.save_json_file(self.store_file, self.campaigns_workflow)
-        log_event("Saved campaign state to file.", "INFO")
+        if self.load_file:
+            Utils.save_json_file(self.store_file, self.campaigns_workflow)
+            log_event("Saved campaign state to file.", "INFO")
 
     @staticmethod
-    def delete_state(store_file: str):
+    def delete_state(store_file: Union[str, Path]):
         """Delete the state file."""
-        if os.path.exists(store_file):
-            os.remove(store_file)
+        store_file = Path(store_file)
+        if store_file.exists():
+            store_file.unlink()
             log_event("Deleted campaign state file.", "INFO")
         else:
             log_event("Campaign state file not found.", "WARNING")
@@ -377,8 +382,6 @@ if __name__ == "__main__":
     # initialize_logger()
 
     load_file = False
-    if not load_file and os.path.exists("campaigns.json"):
-        CampaignManager.delete_state("campaigns.json")
 
     from src.modules import InputParser
 
@@ -397,7 +400,7 @@ if __name__ == "__main__":
     example_campaigns2 = InputParser.build_campaign_data(Path(schedules_directory[0]))
     print(manager.add_campaigns(example_campaigns2, "12-02-2025"))
 
-    print(manager.get_campaigns(campaigns_name))
+    print(f"get_campaigns: {manager.get_campaigns(campaigns_name)}")
     print(manager.get_campaign(campaigns_name, "campaign_1"))
     print(manager.get_stage(campaigns_name, "campaign_1", 1))
     print(manager.get_contact(campaigns_name, "campaign_1", 1, "john.doe@example.com"))

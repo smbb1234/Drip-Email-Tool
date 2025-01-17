@@ -1,10 +1,10 @@
-import os
 import pandas as pd
 import json
 import yaml
 import re
 from pathlib import Path
 from typing import List, Dict
+from config import config
 from src.modules import log_event
 from src.utils import Validator
 
@@ -32,7 +32,7 @@ class InputParser:
             FileNotFoundError: If the file does not exist.
             ValueError: If the file cannot be read or is missing required columns.
         """
-        if not os.path.exists(file_path):
+        if not file_path.exists():
             raise FileNotFoundError(f"Contacts file not found: {file_path}")
 
         try:
@@ -71,7 +71,7 @@ class InputParser:
             ValueError: If the file cannot be read, is not a list, or is missing required keys.
         """
         required_keys = {"sequence", "subject", "content"} # Required keys for each template
-        if not os.path.exists(file_path):
+        if not file_path.exists():
             raise FileNotFoundError(f"Templates file not found: {file_path}")
 
         templates = []
@@ -107,7 +107,7 @@ class InputParser:
             ValueError: If the file cannot be read, is not a list, or is missing required keys.
         """
         required_keys = {"campaign_id", "sequences"} # Required keys for each campaign
-        if not os.path.exists(file_path):
+        if not file_path.exists():
             raise FileNotFoundError(f"Schedule file not found: {file_path}")
 
         try:
@@ -158,7 +158,7 @@ class InputParser:
             FileNotFoundError: If schedule or template files are missing.
             ValueError: If required data is invalid or incomplete.
         """
-        schedule_file = base_path / "schedule.json"
+        schedule_file = base_path / config.SCHEDULE_FILE_NAME
 
         # Parsing schedules and templates
         schedule = InputParser.load_schedule(schedule_file)
@@ -170,7 +170,7 @@ class InputParser:
             campaigns_data[campaign_id]["campaign_status"] = "Not Started"
 
             # Load each campaign’s templates.yaml
-            templates_path = base_path / campaign_id / "templates.yaml"
+            templates_path = base_path / campaign_id / config.TEMPLATES_FILE_NAME
             templates = InputParser.load_templates(templates_path)
 
             # Create a sequence-to-template mapping
@@ -189,15 +189,15 @@ class InputParser:
 
             for seq in campaign["sequences"]:
                 sequence_id = seq["sequence"]
-                contacts_path = base_path / campaign_id / f"{sequence_id}" / "contacts.csv"
+                contacts_path = base_path / campaign_id / f"{sequence_id}" / config.CONTACTS_FILE_NAME
 
                 # Use the same contact as in the previous stage if contacts file does not exist
-                if not os.path.exists(contacts_path):
+                if not contacts_path.exists():
                     if sequence_id == 1:
                         log_event(f"Contacts file not found for {base_path.resolve()}\\{campaign_id}\\{sequence_id}, skipping the campaign", "ERROR")
                         break
                     log_event(f"Contacts file not found for {base_path.resolve()}\\{campaign_id}\\{sequence_id}, using previous contacts", "WARNING")
-                    contacts_temp = {
+                    richer_contacts = {
                         contact: {
                             **value,
                             "progress": "Not Started"
@@ -206,7 +206,7 @@ class InputParser:
                     }
                 else:
                     contacts = InputParser.load_contacts(contacts_path)
-                    contacts_temp = {  # Set Email as key
+                    richer_contacts = {  # Set Email as key
                         contact["email"]: {
                             "info": {
                                 key: value for key, value in contact.items() if key != "email"
@@ -225,7 +225,7 @@ class InputParser:
                         "start_time": seq['start_time'],
                         "interval": seq['interval'],
                         "template": template,
-                        "contacts": contacts_temp
+                        "contacts": richer_contacts
                     }
                 else:
                     log_event(f"Template not found for {campaign_id} / {sequence_id}", "ERROR")
@@ -233,6 +233,7 @@ class InputParser:
 
 # Example usage (to be integrated into the larger system):
 if __name__ == "__main__":
+    test_directory = Path("../../" + config.DATA_DIR)
     base_directory = Path("../../data/")
 
     # contacts_file = base_directory / "12-01-2025"/ "campaign_1"/ "1" / "contacts.csv"
