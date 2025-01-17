@@ -6,7 +6,8 @@ CONTACTS_FILE_NAME = "contacts.csv"
 
 # Log settings
 LOG_DIR = "logs"
-LOG_FILE_NAME = "app.log"
+BUSINESS_LOG_FILE = "app.log"
+LOGIC_LOG_FILE = "debug.log"
 LOG_LEVEL = "DEBUG"
 
 # Campaign settings
@@ -23,3 +24,6 @@ SENDER_EMAIL = "ramya@DiagonalMatrix.com"
 CUSTOM_VAR = {
     "topic": "Future"
 }
+
+# Enable debug mode
+DEBUG_MODE = False

@@ -8,6 +8,9 @@
 .temp/
 temp*/
 
+# Data directories
+data/
+
 # Requirements report
 *.docx
 
