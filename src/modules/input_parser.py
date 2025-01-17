@@ -223,6 +223,7 @@ class InputParser:
                     campaigns_data[campaign_id][str(sequence_id)] = {
                         "sequence_status": "Not Started",
                         "start_time": seq['start_time'],
+                        "interval": seq['interval'],
                         "template": template,
                         "contacts": richer_contacts
                     }

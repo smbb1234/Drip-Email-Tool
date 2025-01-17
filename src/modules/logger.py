@@ -4,15 +4,17 @@ from functools import wraps
 from config import config
 
 # Logger setup
-def initialize_logger(log_path: str = config.LOG_DIR, log_file: str = config.LOG_FILE_NAME, log_level: int = logging.DEBUG) -> None:
+def initialize_logger(log_path: str = config.LOG_DIR, log_file: str = config.LOG_FILE_NAME, log_level: str = config.LOG_LEVEL) -> None:
     """Initialize the logging configuration."""
     log_file_path = Path(log_path)
     if not log_file_path.exists():
         log_file_path.mkdir(parents=True)
 
     log_file_path = log_file_path / log_file
+    log_level = log_level.upper()
+
     logging.basicConfig(
-        level=log_level,
+        level=getattr(logging, log_level, logging.INFO),
         format="%(asctime)s - %(levelname)s - %(message)s",
         handlers=[
             logging.FileHandler(log_file_path),
