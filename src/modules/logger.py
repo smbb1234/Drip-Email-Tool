@@ -1,6 +1,8 @@
 import logging
 from pathlib import Path
+
 from config import config
+
 
 class Logger:
     def __init__(self, log_path: str = None):
@@ -67,56 +69,4 @@ class Logger:
         self.log_business_event(event)
         self.log_logic_event(event, level)
 
-# Decorator for logging
-# def log_function_call(func):
-#     """Decorator to log function calls and their results."""
-#
-#     @wraps(func)
-#     def wrapper(*args, **kwargs):
-#         logging.info(f"Function {func.__name__} called with arguments {args} and kwargs {kwargs}")
-#         try:
-#             _result = func(*args, **kwargs)
-#             logging.info(f"Function {func.__name__} completed successfully. Result: {_result}")
-#             return _result
-#         except Exception as _e:
-#             logging.error(f"Function {func.__name__} raised an exception: {_e}", exc_info=True)
-#             raise
-#
-#     return wrapper
 
-# Example usage of the logger
-
-if __name__ == "__main__":
-    logger = Logger('logs')
-
-    logger.log_event("Application started")
-
-    # Log business events
-    logger.log_business_event("business event 1")
-
-    logger.log_event("Application running")
-
-    # Log custom events
-    logger.log_logic_event("logic running", "INFO")
-    logger.log_logic_event("This is a debug message", "DEBUG")
-    logger.log_logic_event("Warning: Disk space low", "WARNING")
-    logger.log_logic_event("Critical error occurred", "ERROR")
-
-    logger.log_event("Application stopped")
-
-    # @log_function_call
-    # def add_function(a, b):
-    #     """Add function to demonstrate logging."""
-    #     return a + b
-    # result = add_function(5, 10)
-    # print(f"Result: {result}")
-    #
-    # @log_function_call
-    # def division_function(a, b):
-    #     return a / b
-    # # Call the sample function
-    # try:
-    #     result = division_function(5, 0)
-    #     print(f"Result: {result}")
-    # except Exception as e:
-    #     print(f"An error occurred: {e}")

@@ -1,10 +1,11 @@
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Union
+
 from config import config
 from src.modules import logger
 from src.utils import Utils
+
 
 class CampaignManager:
     """Manage email campaigns and track their progress."""
@@ -372,40 +373,3 @@ class CampaignManager:
         else:
             logger.log_logic_event("Campaign state file not found.", "WARNING")
 
-
-if __name__ == "__main__":
-
-    load_file = False
-
-    from src.modules import InputParser
-
-    data_directory = Path("../../data/2025/Jan/12Sun")
-
-    campaigns_name  = "12-01-2025"
-    example_campaigns1 = InputParser.build_campaign_data(data_directory)
-    manager = CampaignManager(example_campaigns1, campaigns_name, load_file, "campaigns.json")
-
-    example_campaigns2 = InputParser.build_campaign_data(data_directory)
-    print(manager.add_campaigns(example_campaigns2, "12-02-2025"))
-
-    print(f"get_campaigns: {manager.get_campaigns(campaigns_name)}")
-    print(manager.get_campaign(campaigns_name, "campaign_1"))
-    print(manager.get_stage(campaigns_name, "campaign_1", 1))
-    print(manager.get_contact(campaigns_name, "campaign_1", 1, "john.doe@example.com"))
-
-    print(manager.get_current_stage(campaigns_name, "campaign_1"))
-    print(manager.start_campaign(campaigns_name, "campaign_1"))
-    print(manager.get_campaign(campaigns_name, "campaign_1"))
-
-    print(manager.move_to_next_stage(campaigns_name, "campaign_1"))
-    print(manager.get_current_stage(campaigns_name, "campaign_1"))
-    print(manager.get_stage_template(campaigns_name, "campaign_1", 2))
-    print(manager.get_stage_start_time(campaigns_name, "campaign_1", 2))
-    print(manager.get_stage_interval(campaigns_name, "campaign_1", 2))
-    print(manager.is_end_of_stage(campaigns_name, "campaign_1"))
-    print(manager.move_to_next_stage(campaigns_name, "campaign_1"))
-    print(manager.get_current_stage(campaigns_name, "campaign_1"))
-
-    print(manager.update_stage_status(campaigns_name, "campaign_1", 1, "Completed"))
-    print(manager.update_stage_status(campaigns_name, "campaign_1", 2, "Completed"))
-    print(manager.completed_campaign(campaigns_name, "campaign_1"))
