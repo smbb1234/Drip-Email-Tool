@@ -1,4 +1,4 @@
-from src.modules import log_event
+from src.modules import logger
 from pathlib import Path
 from typing import Union
 
@@ -16,7 +16,7 @@ class Validator:
         """Check if all placeholders in a template exist in a dictionary."""
         missing_fields = placeholders - replacement
         if missing_fields:
-            log_event(f"Missing fields: {missing_fields}", "ERROR")
+            logger.log_logic_event(f"Missing fields: {missing_fields}", "ERROR")
             return False
         return True
 

@@ -1,8 +1,7 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from datetime import datetime, timedelta
-from src.modules import log_event
-from src.modules import CampaignManager
+from src.modules import logger, CampaignManager
 from config import config
 from typing import Callable
 
@@ -21,18 +20,18 @@ class Scheduler:
             current_stage, total_stage = self.campaign_manager.get_current_stage(campaigns_name, campaign_id)
 
             if not self.add_task(campaigns_name, campaign_id, current_stage, action):
-               log_event(f"Failed to schedule {campaigns_name} - {campaign_id} - {current_stage}.", "ERROR")
+               logger.log_logic_event(f"Failed to schedule {campaigns_name} - {campaign_id} - {current_stage}.", "ERROR")
                return False
 
             start_time = self.campaign_manager.get_stage_start_time(campaigns_name, campaign_id, current_stage)
 
-            log_event(f"Scheduling {campaigns_name} - {campaign_id} - {current_stage} to start at {datetime.isoformat(start_time)}. Total stage: {total_stage}.",
+            logger.log_logic_event(f"Scheduling {campaigns_name} - {campaign_id} - {current_stage} to start at {datetime.isoformat(start_time)}. Total stage: {total_stage}.",
                       "INFO")
 
             self.campaign_manager.update_stage_status(campaigns_name, campaign_id, current_stage, "In Progress")
             return True
         except Exception as e:
-            log_event(f"Failed to schedule {campaigns_name} - {campaign_id}: {e}", "ERROR")
+            logger.log_logic_event(f"Failed to schedule {campaigns_name} - {campaign_id}: {e}", "ERROR")
             return False
 
     def schedule_next_stage(self, campaigns_name: str, campaign_id: str, action: Callable) -> bool:
@@ -52,38 +51,38 @@ class Scheduler:
             current_stage, _ = self.campaign_manager.get_current_stage(campaigns_name, campaign_id)
 
             if not self.add_task(campaigns_name, campaign_id, current_stage, action):
-               log_event(f"Failed to schedule {campaigns_name} - {campaign_id} - {current_stage}.", "ERROR")
+               logger.log_logic_event(f"Failed to schedule {campaigns_name} - {campaign_id} - {current_stage}.", "ERROR")
                return False
 
             start_time = self.campaign_manager.get_stage_start_time(campaigns_name, campaign_id, current_stage)
 
-            log_event(f"Scheduling {campaigns_name} - {campaign_id} - {current_stage} to start at {datetime.isoformat(start_time)}. Total stage: {total_stage}.",
+            logger.log_logic_event(f"Scheduling {campaigns_name} - {campaign_id} - {current_stage} to start at {datetime.isoformat(start_time)}. Total stage: {total_stage}.",
                       "INFO")
 
             self.campaign_manager.update_stage_status(campaigns_name, campaign_id, current_stage, "In Progress")
             return True
 
         except Exception as e:
-            log_event(f"Failed to schedule next stage for {campaigns_name} - {campaign_id}: {e}", "ERROR")
+            logger.log_logic_event(f"Failed to schedule next stage for {campaigns_name} - {campaign_id}: {e}", "ERROR")
             return False
 
     def add_task(self, campaigns_name: str, campaign_id: str, stage: int, action: Callable) -> bool:
         """Add a task to the scheduler."""
         try:
             if not self.campaign_manager.get_campaign(campaigns_name, campaign_id):
-                log_event(f"Failed to add task for {campaigns_name} - {campaign_id} - {stage}: Campaign not found.", "ERROR")
+                logger.log_logic_event(f"Failed to add task for {campaigns_name} - {campaign_id} - {stage}: Campaign not found.", "ERROR")
                 return False
 
             _, total_stage = self.campaign_manager.get_current_stage(campaigns_name, campaign_id)
             if stage == 0 or total_stage == 0 or stage > total_stage:
-                log_event(f"Failed to add task for {campaigns_name} - {campaign_id} - {stage}: Invalid stage.", "ERROR")
+                logger.log_logic_event(f"Failed to add task for {campaigns_name} - {campaign_id} - {stage}: Invalid stage.", "ERROR")
                 return False
             sequence = self.campaign_manager.get_stage(campaigns_name, campaign_id, stage)
 
             start_time = self.campaign_manager.get_stage_start_time(campaigns_name, campaign_id, stage)
             interval = self.campaign_manager.get_stage_interval(campaigns_name, campaign_id, stage)
             if self.schedule_time_exceeded(start_time):
-                log_event(
+                logger.log_logic_event(
                     f"Start time {datetime.isoformat(start_time)} for {campaigns_name} - {campaign_id} - {stage} has already passed. Rescheduled in {interval} seconds.",
                     "WARNING")
                 start_time = datetime.now() + timedelta(seconds=interval)
@@ -103,27 +102,27 @@ class Scheduler:
                 id=f"{campaigns_name}_{campaign_id}_{stage}",
                 name=f"Task: {campaigns_name}_{campaign_id}_{stage}"
             )
-            log_event(f"Task added for {campaigns_name} - {campaign_id} - {stage}.", "INFO")
+            logger.log_event(f"The task is scheduled to start on {start_time.isoformat(timespec='seconds')}, in sequence {stage} campaign {campaign_id} folder {campaigns_name}.", "INFO")
             return True
         except Exception as e:
-            log_event(f"Failed to add task for {campaigns_name} - {campaign_id} - {stage}: {e}", "ERROR")
+            logger.log_logic_event(f"Failed to add task for {campaigns_name} - {campaign_id} - {stage}: {e}", "ERROR")
             return False
 
     def remove_task(self, campaigns_name: str, campaign_id: str, stage: int) -> bool:
         """Remove a task from the scheduler."""
         try:
             if not self.campaign_manager.get_campaign(campaigns_name, campaign_id):
-                log_event(f"Failed to remove task for {campaigns_name} - {campaign_id} - {stage}: Campaign not found.", "ERROR")
+                logger.log_logic_event(f"Failed to remove task for {campaigns_name} - {campaign_id} - {stage}: Campaign not found.", "ERROR")
                 return False
 
             if self.scheduler.get_job(f"{campaigns_name}_{campaign_id}_{stage}"):
                 self.scheduler.remove_job(f"{campaigns_name}_{campaign_id}_{stage}")
-                log_event(f"Task removed for {campaigns_name} - {campaign_id} - {stage}.", "INFO")
+                logger.log_logic_event(f"Task removed for {campaigns_name} - {campaign_id} - {stage}.", "INFO")
                 return True
-            log_event(f"Failed to remove task for {campaigns_name} - {campaign_id} - {stage}: Task not found.", "ERROR")
+            logger.log_logic_event(f"Failed to remove task for {campaigns_name} - {campaign_id} - {stage}: Task not found.", "ERROR")
             return False
         except Exception as e:
-            log_event(f"Failed to remove task for {campaigns_name} - {campaign_id} - {stage}: {e}", "ERROR")
+            logger.log_logic_event(f"Failed to remove task for {campaigns_name} - {campaign_id} - {stage}: {e}", "ERROR")
             return False
 
     @staticmethod
@@ -136,21 +135,21 @@ class Scheduler:
     def run_scheduler(self):
         """Run the scheduler."""
         self.scheduler.start()
-        log_event("Scheduler started.", "INFO")
+        logger.log_logic_event("Scheduler started.", "INFO")
 
     def shutdown_scheduler(self):
         """Shutdown the scheduler."""
         self.scheduler.shutdown()
-        log_event("Scheduler shutdown.", "INFO")
+        logger.log_logic_event("Scheduler shutdown.", "INFO")
 
 if __name__ == "__main__":
     from src.modules import InputParser
     import os
     from pathlib import Path
     from time import sleep
-    from src.modules import initialize_logger
+    from src.modules import Logger
 
-    initialize_logger("../../logs/", "scheduler.log")
+    logger = Logger("../../logs/")
 
     def test_action(*args):
         print(f"{datetime.now()}: {args}, ")
@@ -176,7 +175,7 @@ if __name__ == "__main__":
 
         print(f"Scheduler start at {datetime.now()}")
         scheduler.run_scheduler()
-        log_event("Scheduler running. Press Ctrl+C to exit.", "INFO")
+        logger.log_logic_event("Scheduler running. Press Ctrl+C to exit.", "INFO")
         try:
             while True:
                 sleep(7)
@@ -191,5 +190,5 @@ if __name__ == "__main__":
             exit(1)
 
     except Exception as e:
-        log_event(f"Failed to initialize scheduler: {e}", "ERROR")
+        logger.log_logic_event(f"Failed to initialize scheduler: {e}", "ERROR")
         raise

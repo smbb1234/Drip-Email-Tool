@@ -16,7 +16,8 @@ sys.path.append(project_root)
 os.chdir(project_root)
 
 from config import config
-from src.modules import InputParser, CampaignManager, Scheduler, EmailSender, DataFolderHandler, initialize_logger, log_event
+from src.modules import logger
+from src.modules import InputParser, CampaignManager, Scheduler, EmailSender, DataFolderHandler
 from src.utils import Validator
 
 # Wake-up event
@@ -38,11 +39,11 @@ def process_directory(path: Union[str, Path], **kwargs):
         email_sender = kwargs.get("email_sender")
 
         if scheduler is None:
-            log_event("Scheduler is not configured.", "ERROR")
+            logger.log_logic_event("Scheduler is not configured.", "ERROR")
             return
 
         if email_sender is None:
-            log_event("Email sender is not configured.", "ERROR")
+            logger.log_logic_event("Email sender is not configured.", "ERROR")
             return
 
         # Schedule campaigns
@@ -64,7 +65,7 @@ def process_directory(path: Union[str, Path], **kwargs):
         event.set()
 
     except Exception as e:
-        log_event(f"{e}", "ERROR")
+        logger.log_logic_event(f"{e}", "ERROR")
 
 # Define email sending action
 def send_email_action(
@@ -75,10 +76,10 @@ def send_email_action(
         email_sender : EmailSender = None
 ):
     if not campaign_manager:
-        log_event(f"Campaign manager is not configured.", "ERROR")
+        logger.log_logic_event(f"Campaign manager is not configured.", "ERROR")
         return False
     if not email_sender:
-        log_event(f"Email sender is not configured.", "ERROR")
+        logger.log_logic_event(f"Email sender is not configured.", "ERROR")
         return False
 
     campaigns_name, campaign_id, current_stage = campaign_info
@@ -88,7 +89,10 @@ def send_email_action(
             campaign_template=template,
             contact_info=info
         )
-        log_event(f"Email has been generated and ready to be sent...", "INFO")
+        if not subject or not content:
+            logger.log_event(f"Failed to build email content for {contact_email}, some fields may be missing.", "ERROR")
+            continue
+        logger.log_logic_event(f"Email has been generated and ready to be sent...", "INFO")
 
         # success = email_sender.send_email(
         #     recipients=[contact_email],
@@ -99,9 +103,8 @@ def send_email_action(
         success = True
 
         if success:
-            log_event(
-                f"Sent email to {contact_email} for {campaigns_name} - {campaign_id}, stage {current_stage}.",
-                "INFO")
+            logger.log_event(
+                f"Sent email to {contact_email} for {info["info"]["name"]} on Campaign Name: {campaign_id} from folder: {campaigns_name}, during sequence {current_stage}.")
             campaign_manager.update_contact_status(
                 campaigns_name,
                 campaign_id,
@@ -111,7 +114,7 @@ def send_email_action(
             )
             event.set()
         else:
-            log_event(
+            logger.log_logic_event(
                 f"Failed to send email to {contact_email} for {campaigns_name} - {campaign_id}, stage {current_stage}.",
                 "ERROR")
 
@@ -119,8 +122,7 @@ def main():
     # Directories to monitor
     data_directory = Path(config.DATA_DIR)
 
-    # initialize_logger()
-    # log_event("Application initialization", "INFO")
+    logger.log_event("Application initialization")
 
     scheduler: Union[Scheduler, None] = None
     observer: Union[Observer, None] = None
@@ -153,7 +155,7 @@ def main():
         observer.start()
 
         if scheduler is None:
-            log_event("Scheduler is not configured.", "ERROR")
+            logger.log_logic_event("Scheduler is not configured.", "ERROR")
             raise Exception("Scheduler is not configured.")
 
         for schedule in schedules_directory:
@@ -181,7 +183,7 @@ def main():
                     )
                 )
 
-        log_event("Application running. Press Ctrl+C to exit.", "WARNING")
+        logger.log_event("Application running. Press Ctrl+C to exit.")
 
         # Run scheduler
         scheduler.run_scheduler()
@@ -210,18 +212,18 @@ def main():
                         continue
 
                 if scheduler.campaign_manager.completed_all_campaigns(campaigns_name):
-                    log_event(f"All campaigns for {campaigns_name} have been completed.", "WARNING")
+                    logger.log_event(f"All campaigns from {campaigns_name} have been completed.")
                     scheduler.campaign_manager.del_campaigns(campaigns_name)
 
             if scheduler.campaign_manager.campaigns_workflow == {}:
-                log_event("Please add campaigns.", "WARNING")
+                logger.log_business_event("Please adding campaigns.")
 
             event.clear()
 
     except (KeyboardInterrupt, SystemExit):
         raise KeyboardInterrupt
     except Exception as e:
-        log_event(f"An error occurred: {e}", "ERROR")
+        logger.log_logic_event(f"An error occurred: {e}", "ERROR")
     finally:
         if scheduler:
             scheduler.shutdown_scheduler()
