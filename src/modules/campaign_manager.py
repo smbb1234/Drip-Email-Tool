@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Union
 from config import config
-from src.modules import log_event
+from src.modules import logger
 from src.utils import Utils
 
 class CampaignManager:
@@ -21,122 +21,120 @@ class CampaignManager:
         if self.store_file.exists():
             if self.load_file:
                 self.campaigns_workflow = Utils.load_json_file(self.store_file)
-                log_event("Campaign state file loaded successfully.", "INFO")
+                logger.log_logic_event("Campaign state file loaded successfully.", "INFO")
                 return
             else:
                 self.store_file.unlink()
-        log_event("Campaign store file not found.", "WARNING")
+        logger.log_logic_event("Campaign store file not found.", "WARNING")
 
         if campaign_data is not None:
             self.campaigns_workflow = {
                 campaigns_name: campaign_data
             }
 
-            log_event(f"Initialized {campaigns_name}.", "INFO")
+            logger.log_event(f"Initialized {campaigns_name}.", "INFO")
             self.save_state()
             return
-
-        log_event("Please add campaigns manually", "WARNING")
 
     def add_campaigns(self, campaigns_data: Dict, campaigns_name: str = datetime.now().strftime("%d-%m-%Y")) -> bool:
         """Add new campaigns to the manager."""
         if campaigns_name in self.campaigns_workflow:
-            log_event(f"Campaigns {campaigns_name} already exists.", "ERROR")
+            logger.log_event(f"Campaigns {campaigns_name} already exists.", "ERROR")
             return False
 
         self.campaigns_workflow[campaigns_name] = campaigns_data
         self.save_state()
-        log_event(f"Added new campaigns {campaigns_name}.", "INFO")
+        logger.log_event(f"Added new campaigns {campaigns_name}.", "INFO")
         return True
 
     def get_campaigns(self, campaigns_name: str) -> Dict:
         """Retrieve campaigns by campaigns name."""
         if campaigns_name not in self.campaigns_workflow:
-            log_event(f"Campaigns {campaigns_name} does not exist.", "ERROR")
+            logger.log_event(f"Campaigns {campaigns_name} does not exist.", "ERROR")
             return {}
 
-        log_event(f"Retrieved campaigns for {campaigns_name}.", "INFO")
+        logger.log_logic_event(f"Retrieved campaigns for {campaigns_name}.", "INFO")
         return self.campaigns_workflow[campaigns_name]
 
     def del_campaigns(self, campaigns_name: str) -> bool:
         """Delete campaigns by campaigns name."""
         if campaigns_name not in self.campaigns_workflow:
-            log_event(f"Campaigns {campaigns_name} does not exist.", "ERROR")
+            logger.log_event(f"Campaigns {campaigns_name} does not exist.", "ERROR")
             return False
 
         del self.campaigns_workflow[campaigns_name]
         self.save_state()
-        log_event(f"Deleted campaigns {campaigns_name}.", "INFO")
+        logger.log_event(f"Deleted campaigns {campaigns_name}.", "INFO")
         return True
 
     def get_campaign(self, campaigns_name: str, campaign_id: str) -> Dict:
         """Retrieve the campaign data."""
         if campaigns_name not in self.campaigns_workflow:
-            log_event(f"Campaigns {campaigns_name} does not exist.", "ERROR")
+            logger.log_event(f"Campaigns {campaigns_name} does not exist.", "ERROR")
             return {}
         if campaign_id not in self.campaigns_workflow[campaigns_name]:
-            log_event(f"Campaign: {campaigns_name} - {campaign_id} does not exist.", "ERROR")
+            logger.log_event(f"Campaign: {campaign_id} in {campaigns_name} does not exist.", "ERROR")
             return {}
 
-        log_event(f"Retrieved data for {campaigns_name} - {campaign_id}.", "INFO")
+        logger.log_logic_event(f"Retrieved data for {campaigns_name} - {campaign_id}.", "INFO")
         return self.campaigns_workflow[campaigns_name][campaign_id]
 
     def update_campaign_status(self, campaigns_name: str, campaign_id: str, status: str) -> bool:
         """Update the status of the campaign."""
         if campaigns_name not in self.campaigns_workflow:
-            log_event(f"Campaigns {campaigns_name} does not exist.", "ERROR")
+            logger.log_event(f"Campaigns {campaigns_name} does not exist.", "ERROR")
             return False
         if campaign_id not in self.campaigns_workflow[campaigns_name]:
-            log_event(f"Campaign: {campaigns_name} - {campaign_id} does not exist.", "ERROR")
+            logger.log_event(f"Campaign: {campaign_id} in {campaigns_name} does not exist.", "ERROR")
             return False
 
         if status not in self.CAMPAIGN_ALLOWED_STATUSES:
-            log_event(f"Invalid status '{status}' for campaign {campaigns_name} - {campaign_id}. Allowed statuses: {self.CAMPAIGN_ALLOWED_STATUSES}.", "ERROR")
+            logger.log_logic_event(f"Invalid status '{status}' for campaign {campaigns_name} - {campaign_id}. Allowed statuses: {self.CAMPAIGN_ALLOWED_STATUSES}.", "ERROR")
             return False
 
         if self.campaigns_workflow[campaigns_name][campaign_id]["campaign_status"] != status:
             self.campaigns_workflow[campaigns_name][campaign_id]["campaign_status"] = status
             self.save_state()
 
-        log_event(f"Updated campaign {campaign_id} to status: {status}.", "INFO")
+        logger.log_logic_event(f"Updated campaign {campaign_id} to status: {status}.", "INFO")
         return True
 
     def get_stage(self, campaigns_name: str, campaign_id: str, stage: int) -> Dict:
         """Retrieve the stage data."""
         if campaigns_name not in self.campaigns_workflow:
-            log_event(f"Campaigns {campaigns_name} does not exist.", "ERROR")
+            logger.log_event(f"Campaigns {campaigns_name} does not exist.", "ERROR")
             return {}
         if campaign_id not in self.campaigns_workflow[campaigns_name]:
-            log_event(f"Campaign: {campaigns_name} - {campaign_id} does not exist.", "ERROR")
+            logger.log_event(f"Campaign: {campaign_id} in {campaigns_name} does not exist.", "ERROR")
             return {}
         if str(stage) not in self.campaigns_workflow[campaigns_name][campaign_id]:
-            log_event(f"Stage {stage} is out of range for campaign {campaigns_name} - {campaign_id}.", "ERROR")
+            logger.log_event(f"Sequence {stage} is out of range for campaign {campaign_id} in {campaigns_name}.", "ERROR")
             return {}
 
-        log_event(f"Retrieved data for stage {stage} in {campaigns_name} - {campaign_id}.", "INFO")
+        logger.log_logic_event(f"Retrieved data for stage {stage} in {campaigns_name} - {campaign_id}.", "INFO")
         return self.campaigns_workflow[campaigns_name][campaign_id][str(stage)]
 
     def update_stage_status(self, campaigns_name: str, campaign_id: str, stage: int, status: str) -> bool:
         """Update the status of the stage."""
         if campaigns_name not in self.campaigns_workflow:
-            log_event(f"Campaigns {campaigns_name} does not exist.", "ERROR")
+            logger.log_event(f"Campaigns {campaigns_name} does not exist.", "ERROR")
             return False
         if campaign_id not in self.campaigns_workflow[campaigns_name]:
-            log_event(f"Campaign: {campaigns_name} - {campaign_id} does not exist.", "ERROR")
+            logger.log_event(f"Campaign: {campaign_id} in {campaigns_name} does not exist.", "ERROR")
             return False
         if str(stage) not in self.campaigns_workflow[campaigns_name][campaign_id]:
-            log_event(f"Stage {stage} is out of range for campaign {campaigns_name} - {campaign_id}.", "ERROR")
+            logger.log_event(f"Sequence {stage} is out of range for campaign {campaign_id} in {campaigns_name}.", "ERROR")
             return False
 
         if status not in self.CAMPAIGN_ALLOWED_STATUSES:
-            log_event(f"Invalid status '{status}' for stage {stage} in campaign {campaigns_name} - {campaign_id}. Allowed statuses: {self.CAMPAIGN_ALLOWED_STATUSES}.", "ERROR")
+            logger.log_logic_event(f"Invalid status '{status}' for stage {stage} in campaign {campaigns_name} - {campaign_id}. Allowed statuses: {self.CAMPAIGN_ALLOWED_STATUSES}.", "ERROR")
             return False
 
         if self.campaigns_workflow[campaigns_name][campaign_id][str(stage)]["sequence_status"] != status:
             self.campaigns_workflow[campaigns_name][campaign_id][str(stage)]["sequence_status"] = status
             self.save_state()
 
-        log_event(f"Updated stage {stage} in {campaigns_name} - {campaign_id} to status: {status}.", "INFO")
+        logger.log_logic_event(f"Updated stage {stage} in {campaigns_name} - {campaign_id} to status: {status}.", "INFO")
         return True
 
     def get_contact(self, campaigns_name: str, campaign_id: str, stage: int, contact_email: str) -> Dict:
@@ -146,10 +144,10 @@ class CampaignManager:
         if not sequence:
             return {}
         if contact_email not in sequence["contacts"]:
-            log_event(f"Contact {contact_email} not found in stage {stage} of campaign {campaigns_name} - {campaign_id}.", "ERROR")
+            logger.log_event(f"Contact email {contact_email} not found in sequence {stage} of campaign {campaign_id} in {campaigns_name}.", "ERROR")
             return {}
 
-        log_event(f"Retrieved data for contact {contact_email} in stage {stage} of {campaigns_name} - {campaign_id}.", "INFO")
+        logger.log_logic_event(f"Retrieved data for contact {contact_email} in stage {stage} of {campaigns_name} - {campaign_id}.", "INFO")
         return sequence["contacts"][contact_email]
 
     def update_contact_status(self, campaigns_name: str, campaign_id: str, stage: int, contact_email: str, status: str) -> bool:
@@ -159,20 +157,18 @@ class CampaignManager:
         if not sequence:
             return False
         if contact_email not in sequence["contacts"]:
-            log_event(
-                f"Contact {contact_email} not found in stage {stage} of campaign {campaigns_name} - {campaign_id}.",
-                "ERROR")
+            logger.log_event(f"Contact email {contact_email} not found in sequence {stage} of campaign {campaign_id} in {campaigns_name}.", "ERROR")
             return False
 
         if status not in self.CONTACT_ALLOWED_STATUSES:
-            log_event(f"Invalid status '{status}' for contact {contact_email} in stage {stage} of campaign {campaigns_name} - {campaign_id}. Allowed statuses: {self.CONTACT_ALLOWED_STATUSES}.", "ERROR")
+            logger.log_logic_event(f"Invalid status '{status}' for contact {contact_email} in stage {stage} of campaign {campaigns_name} - {campaign_id}. Allowed statuses: {self.CONTACT_ALLOWED_STATUSES}.", "ERROR")
             return False
 
         if sequence["contacts"][contact_email]["progress"] != status:
             sequence["contacts"][contact_email]["progress"] = status
             self.save_state()
 
-        log_event(f"Updated contact {contact_email} in stage {stage} of {campaigns_name} - {campaign_id} to status: {status}.", "INFO")
+        logger.log_logic_event(f"Updated contact {contact_email} in stage {stage} of {campaigns_name} - {campaign_id} to status: {status}.", "INFO")
         return True
 
     def get_current_stage(self, campaigns_name: str, campaign_id: str):
@@ -227,7 +223,7 @@ class CampaignManager:
 
         sequence["start_time"] = new_time.isoformat(timespec='seconds')
         self.save_state()
-        log_event(f"Updated start time for stage {stage} in {campaigns_name} - {campaign_id}.", "INFO")
+        logger.log_logic_event(f"Updated start time for stage {stage} in {campaigns_name} - {campaign_id}.", "INFO")
         return True
 
     def get_stage_interval(self, campaigns_name: str, campaign_id: str, stage: int) -> int:
@@ -265,23 +261,23 @@ class CampaignManager:
             return False
 
         if campaign["campaign_status"] != "Not Started":
-            log_event(f"{campaigns_name} - {campaign_id} has already started.", "WARNING")
+            logger.log_event(f"Campaign {campaign_id} in {campaigns_name} has already started.", "WARNING")
 
         current_stage, total_stage = self.get_current_stage(campaigns_name, campaign_id)
         sequence = self.get_stage(campaigns_name, campaign_id, current_stage)
 
         if not sequence:
-            log_event(f"Fail to start {campaigns_name} - {campaign_id} - {current_stage}.", "ERROR")
+            logger.log_logic_event(f"Fail to start {campaigns_name} - {campaign_id} - {current_stage}.", "ERROR")
             return False
 
         for contact_email, contact in sequence["contacts"].items():
             if contact["progress"] != "Not Started":
-                log_event(f"{campaigns_name} - {campaign_id} - {current_stage} - {contact} has already started.", "WARNING")
+                logger.log_event(f"Contact {contact} has already started located at sequence {current_stage}, campaign {campaign_id}, folder {campaigns_name}", "WARNING")
             self.update_contact_status(campaigns_name, campaign_id, current_stage, contact_email, "Pending")
 
         self.update_stage_status(campaigns_name, campaign_id, current_stage, "In Progress")
         self.update_campaign_status(campaigns_name, campaign_id, "In Progress")
-        log_event(f"Campaign {campaign_id} started.", "INFO")
+        logger.log_event(f"Campaign {campaign_id} started.", "INFO")
         return True
 
     def move_to_next_stage(self, campaigns_name: str, campaign_id: str) -> bool:
@@ -299,11 +295,11 @@ class CampaignManager:
 
         for contact_email, contact in sequence["contacts"].items():
             if contact["progress"] != "Not Started":
-                log_event(f"{campaigns_name} - {campaign_id} - {next_stage} - {contact} has already started.", "WARNING")
+                logger.log_event(f"Contact {contact} has already started located at sequence {current_stage}, campaign {campaign_id}, folder {campaigns_name}", "WARNING")
             self.update_contact_status(campaigns_name, campaign_id, next_stage, contact_email, "Pending")
 
         self.update_stage_status(campaigns_name, campaign_id, next_stage, "In Progress")
-        log_event(f"Moved to next stage {next_stage} in {campaigns_name} - {campaign_id}.", "INFO")
+        logger.log_event(f"Started to next sequence {next_stage}, campaign {campaign_id}, folder {campaigns_name}.", "INFO")
         return True
 
     def completed_stage(self, campaigns_name: str, campaign_id: str, stage: int) -> bool:
@@ -321,7 +317,7 @@ class CampaignManager:
             }:
                 return False
         self.update_stage_status(campaigns_name, campaign_id, stage, "Completed")
-        log_event(f"Stage {stage} in {campaigns_name} - {campaign_id} completed.", "INFO")
+        logger.log_event(f"Sequence {stage} completed, in campaign {campaign_id} folder {campaigns_name}.", "INFO")
         return True
 
     def completed_campaign(self, campaigns_name: str, campaign_id: str) -> bool:
@@ -342,7 +338,7 @@ class CampaignManager:
                 return False
 
         self.update_campaign_status(campaigns_name, campaign_id, "Completed")
-        log_event(f"{campaign_id} in {campaigns_name} completed.", "INFO")
+        logger.log_event(f"Campaign {campaign_id} completed, in folder {campaigns_name} .", "INFO")
         return True
 
     def completed_all_campaigns(self, campaigns_name: str) -> bool:
@@ -357,14 +353,14 @@ class CampaignManager:
             if campaign["campaign_status"] != "Completed":
                 return False
 
-        log_event(f"All campaigns in {campaigns_name} completed.", "INFO")
+        logger.log_event(f"All campaigns completed in folder {campaigns_name} .", "INFO")
         return True
 
     def save_state(self):
         """Save the current campaign state to the state file."""
         if self.load_file:
             Utils.save_json_file(self.store_file, self.campaigns_workflow)
-            log_event("Saved campaign state to file.", "INFO")
+            logger.log_logic_event("Saved campaign state to file.", "INFO")
 
     @staticmethod
     def delete_state(store_file: Union[str, Path]):
@@ -372,32 +368,24 @@ class CampaignManager:
         store_file = Path(store_file)
         if store_file.exists():
             store_file.unlink()
-            log_event("Deleted campaign state file.", "INFO")
+            logger.log_logic_event("Deleted campaign state file.", "INFO")
         else:
-            log_event("Campaign state file not found.", "WARNING")
+            logger.log_logic_event("Campaign state file not found.", "WARNING")
 
 
 if __name__ == "__main__":
-    # from src.modules import initialize_logger
-    # initialize_logger()
 
     load_file = False
 
     from src.modules import InputParser
 
-    data_directory = Path("../../data")
-    schedules_directory = []
-    items = os.listdir(data_directory)
-    for item in items:
-        item_path = data_directory / item
-        if os.path.isdir(item_path):
-            schedules_directory.append(str(item_path))
+    data_directory = Path("../../data/2025/Jan/12Sun")
 
-    campaigns_path, campaigns_name = os.path.split(schedules_directory[0])
-    example_campaigns1 = InputParser.build_campaign_data(Path(schedules_directory[0]))
+    campaigns_name  = "12-01-2025"
+    example_campaigns1 = InputParser.build_campaign_data(data_directory)
     manager = CampaignManager(example_campaigns1, campaigns_name, load_file, "campaigns.json")
 
-    example_campaigns2 = InputParser.build_campaign_data(Path(schedules_directory[0]))
+    example_campaigns2 = InputParser.build_campaign_data(data_directory)
     print(manager.add_campaigns(example_campaigns2, "12-02-2025"))
 
     print(f"get_campaigns: {manager.get_campaigns(campaigns_name)}")

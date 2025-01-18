@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Union, Callable
 from watchdog.events import FileSystemEventHandler
-from src.modules import log_event, Scheduler
+from src.modules import logger
 from src.utils import Validator
 
 # Data folder monitoring processor
@@ -14,7 +14,7 @@ class DataFolderHandler(FileSystemEventHandler):
         """Handle new file events"""
         event_path = Path(event.src_path)
         if not event.is_directory:
-            log_event(f"New file detected: {event_path.resolve()}", "INFO")
+            logger.log_logic_event(f"New file detected: {event_path.resolve()}", "INFO")
             self.check_and_process(event_path)
 
     def check_and_process(self, file_path: Union[str, Path]):
@@ -22,15 +22,15 @@ class DataFolderHandler(FileSystemEventHandler):
         file_path = Path(file_path)
         if file_path.suffix == ".json" and Validator.is_valid_structure(file_path.parent):
             self.process_callback(file_path.parent, **self.kwargs)
-            log_event(f"A new json file was detected {file_path.resolve()}, verifying the directory contents", "INFO")
+            logger.log_logic_event(f"A new json file was detected {file_path.resolve()}, verifying the directory contents", "INFO")
 
         if file_path.suffix == ".yaml" and Validator.is_valid_structure(file_path.parents[1]):
             self.process_callback(file_path.parents[1], **self.kwargs)
-            log_event(f"A new yaml file was detected {file_path.resolve()}, verifying the directory contents", "INFO")
+            logger.log_logic_event(f"A new yaml file was detected {file_path.resolve()}, verifying the directory contents", "INFO")
 
         if file_path.suffix == ".csv" and Validator.is_valid_structure(file_path.parents[2]):
             self.process_callback(file_path.parents[2], **self.kwargs)
-            log_event(f"A new csv file was detected {file_path.resolve()}, verifying the directory contents", "INFO")
+            logger.log_logic_event(f"A new csv file was detected {file_path.resolve()}, verifying the directory contents", "INFO")
 
 if __name__ == "__main__":
     import threading
@@ -47,11 +47,10 @@ if __name__ == "__main__":
         except Exception as e:
             log_event(f"{e}", "ERROR")
 
-    import time
     from watchdog.observers import Observer
-    from src.modules import initialize_logger
+    # from src.modules import Logger
 
-    initialize_logger("../../logs", "folder_watchdog.log")
+    # logger = Logger("../../logs")
     # Directories to monitor
     monitor_dir = Path("../../data")
 

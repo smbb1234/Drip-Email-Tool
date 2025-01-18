@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import List, Dict
 from config import config
-from src.modules import log_event
+from src.modules import logger
 from src.utils import Validator
 
 class InputParser:
@@ -46,7 +46,7 @@ class InputParser:
 
         def filter_invalidate_email(email):
             if not Validator.validate_email_format(email):
-                log_event(f"Invalid email skipped: {email}", "WARNING")
+                logger.log_logic_event(f"Invalid email skipped: {email}", "WARNING")
                 return False
             return True
 
@@ -194,9 +194,9 @@ class InputParser:
                 # Use the same contact as in the previous stage if contacts file does not exist
                 if not contacts_path.exists():
                     if sequence_id == 1:
-                        log_event(f"Contacts file not found for {base_path.resolve()}\\{campaign_id}\\{sequence_id}, skipping the campaign", "ERROR")
+                        logger.log_logic_event(f"Contacts file not found for {base_path.resolve()}\\{campaign_id}\\{sequence_id}, skipping the campaign", "ERROR")
                         break
-                    log_event(f"Contacts file not found for {base_path.resolve()}\\{campaign_id}\\{sequence_id}, using previous contacts", "WARNING")
+                    logger.log_logic_event(f"Contacts file not found for {base_path.resolve()}\\{campaign_id}\\{sequence_id}, using previous contacts", "WARNING")
                     richer_contacts = {
                         contact: {
                             **value,
@@ -228,7 +228,7 @@ class InputParser:
                         "contacts": richer_contacts
                     }
                 else:
-                    log_event(f"Template not found for {campaign_id} / {sequence_id}", "ERROR")
+                    logger.log_logic_event(f"Template not found for {campaign_id} / {sequence_id}", "ERROR")
         return campaigns_data
 
 # Example usage (to be integrated into the larger system):

@@ -2,7 +2,7 @@ import boto3
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 from typing import List
 from config import config
-from src.modules import log_event
+from src.modules import logger
 from src.utils import Validator
 
 class EmailSender:
@@ -27,14 +27,14 @@ class EmailSender:
         try:
             sender = sender or config.SENDER_EMAIL
             if not sender:
-                log_event("Sender email is not configured.", "ERROR")
+                logger.log_logic_event("Sender email is not configured.", "ERROR")
                 return False
             if not Validator.validate_email_format(sender):
-                log_event("Invalid sender email format.", "ERROR")
+                logger.log_logic_event("Invalid sender email format.", "ERROR")
                 return False
             for recipient in recipients:
                 if not Validator.validate_email_format(recipient):
-                    log_event("Invalid recipient email format.", "ERROR")
+                    logger.log_logic_event("Invalid recipient email format.", "ERROR")
                     return False
 
             response = self.client.send_email(
@@ -63,22 +63,22 @@ class EmailSender:
             )
 
             if 200 <= response['ResponseMetadata']['HTTPStatusCode'] < 300:
-                log_event(f"Email successfully sent to {recipients}.", "INFO")
+                logger.log_logic_event(f"Email successfully sent to {recipients}.", "INFO")
                 return True
             else:
-                log_event(f"Failed to send email. Status code: {response['ResponseMetadata']['HTTPStatusCode']}", "ERROR")
+                logger.log_logic_event(f"Failed to send email. Status code: {response['ResponseMetadata']['HTTPStatusCode']}", "ERROR")
                 return False
         except NoCredentialsError:
-            log_event("AWS credentials not found.", "ERROR")
+            logger.log_logic_event("AWS credentials not found.", "ERROR")
             return False
         except PartialCredentialsError:
-            log_event("AWS credentials are incomplete.", "ERROR")
+            logger.log_logic_event("AWS credentials are incomplete.", "ERROR")
             return False
         except ClientError as e:
-            log_event(f"An error occurred while sending email to {recipients}: {e.response['Error']['Message']}", "ERROR")
+            logger.log_logic_event(f"An error occurred while sending email to {recipients}: {e.response['Error']['Message']}", "ERROR")
             return False
         except Exception as e:
-            log_event(f"An error occurred: {e}", "ERROR")
+            logger.log_logic_event(f"An error occurred: {e}", "ERROR")
             return False
 
     @staticmethod
@@ -95,20 +95,19 @@ class EmailSender:
         try:
             _subject = campaign_template["subject"]
             _content = campaign_template["content"]
-            custom_vars = config.CUSTOM_VAR
 
             if not _subject or not _content:
-                log_event("Subject or content not found in template.", "ERROR")
+                logger.log_logic_event("Subject or content not found in template.", "ERROR")
                 return "", ""
 
-            replaceable_vars = {**contact_info["info"], **custom_vars}
+            replaceable_vars = contact_info["info"]
 
             # Check if all placeholders are existed
             if not Validator.check_placeholders_all_exist(set(campaign_template["placeholders"]["subject"]), set(replaceable_vars.keys())):
-                log_event(f"Subject missing placeholders", "ERROR")
+                logger.log_logic_event(f"Subject missing placeholders", "ERROR")
                 return "", ""
             if not Validator.check_placeholders_all_exist(set(campaign_template["placeholders"]["content"]), set(replaceable_vars.keys())):
-                log_event(f"Content missing placeholders", "ERROR")
+                logger.log_logic_event(f"Content missing placeholders", "ERROR")
                 return "", ""
 
             # Replace placeholders with contact details
@@ -117,7 +116,7 @@ class EmailSender:
             return _subject, _content
 
         except Exception as e:
-            log_event(f"An error occurred while building email content: {e}", "ERROR")
+            logger.log_logic_event(f"An error occurred while building email content: {e}", "ERROR")
             return "", ""
 
 if __name__ == "__main__":
@@ -157,5 +156,5 @@ if __name__ == "__main__":
         #     print(metric)
 
     except Exception as e:
-        log_event(f"Failed to load input data: {e}", "ERROR")
+        logger.log_logic_event(f"Failed to load input data: {e}", "ERROR")
         exit(1)
