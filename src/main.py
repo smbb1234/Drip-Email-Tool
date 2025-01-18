@@ -212,7 +212,6 @@ def main():
                         continue
 
                 if scheduler.campaign_manager.completed_all_campaigns(campaigns_name):
-                    logger.log_event(f"All campaigns from {campaigns_name} have been completed.")
                     scheduler.campaign_manager.del_campaigns(campaigns_name)
 
             if scheduler.campaign_manager.campaigns_workflow == {}:
