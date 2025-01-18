@@ -1,11 +1,12 @@
 import os
 import sys
 import threading
-from pathlib import Path
-from watchdog.observers import Observer
-from time import sleep
 from datetime import datetime
+from pathlib import Path
+from time import sleep
 from typing import Dict, Union
+
+from watchdog.observers import Observer
 
 # Add the project root directory to sys.path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -94,13 +95,11 @@ def send_email_action(
             continue
         logger.log_logic_event(f"Email has been generated and ready to be sent...", "INFO")
 
-        # success = email_sender.send_email(
-        #     recipients=[contact_email],
-        #     subject=subject,
-        #     content=content
-        # )
-        print([[contact_email],subject,content])
-        success = True
+        success = email_sender.send_email(
+            recipients=[contact_email],
+            subject=subject,
+            content=content
+        )
 
         if success:
             logger.log_event(

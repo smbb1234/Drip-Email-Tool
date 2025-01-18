@@ -1,6 +1,8 @@
-from src.modules import logger
 from pathlib import Path
 from typing import Union
+
+from src.modules import logger
+
 
 class Validator:
 
@@ -44,9 +46,3 @@ class Validator:
 
         # Return True if all conditions are met
         return True
-
-if __name__ == "__main__":
-    # Test the email format validator
-    print(Validator.is_valid_structure("../../data/2025/Jan/16Thu"))
-    print(Validator.is_valid_structure("../../data/2025/Jan/17Fri"))
-    print(Validator.is_valid_structure("../../data/12-01-2025"))

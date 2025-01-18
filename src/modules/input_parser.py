@@ -1,12 +1,15 @@
-import pandas as pd
 import json
-import yaml
 import re
 from pathlib import Path
 from typing import List, Dict
+
+import pandas as pd
+import yaml
+
 from config import config
 from src.modules import logger
 from src.utils import Validator
+
 
 class InputParser:
     """
@@ -231,33 +234,5 @@ class InputParser:
                     logger.log_logic_event(f"Template not found for {campaign_id} / {sequence_id}", "ERROR")
         return campaigns_data
 
-# Example usage (to be integrated into the larger system):
-if __name__ == "__main__":
-    test_directory = Path("../../" + config.DATA_DIR)
-    base_directory = Path("../../data/")
-
-    # contacts_file = base_directory / "12-01-2025"/ "campaign_1"/ "1" / "contacts.csv"
-    # templates_file = base_directory / "12-01-2025"/ "campaign_1"/ "templates.yaml"
-    # schedule_file = base_directory / "12-01-2025"/ "schedule.json"
-    #
-    # try:
-    #     contacts = InputParser.load_contacts(contacts_file)
-    #     templates = InputParser.load_templates(templates_file)
-    #     schedule = InputParser.load_schedule(schedule_file)
-    #
-    #     print("Loaded contacts:", contacts)
-    #     print("Loaded templates:", templates)
-    #     for template in templates:
-    #         print("Extracted placeholders:", InputParser.extract_placeholders(template["content"]))
-    #     print("Loaded schedule:", schedule)
-    # except Exception as e:
-    #     log_event(f"Error during processing: {e}", "ERROR")
-
-    # Build campaign data
-    campaigns_file = base_directory / "12-01-2025"
-    campaign_data = InputParser.build_campaign_data(campaigns_file)
-    print("Campaign data:", campaign_data)
-    # with open(base_directory / "campaigns.json", "w") as f:
-    #     json.dump(campaign_data, f, indent=2)
 
 

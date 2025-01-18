@@ -1,9 +1,12 @@
+from datetime import datetime, timedelta
+from typing import Callable
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from datetime import datetime, timedelta
-from src.modules import logger, CampaignManager
+
 from config import config
-from typing import Callable
+from src.modules import logger, CampaignManager
+
 
 class Scheduler:
     def __init__(self, campaign_manager: CampaignManager):
@@ -141,54 +144,3 @@ class Scheduler:
         """Shutdown the scheduler."""
         self.scheduler.shutdown()
         logger.log_logic_event("Scheduler shutdown.", "INFO")
-
-if __name__ == "__main__":
-    from src.modules import InputParser
-    import os
-    from pathlib import Path
-    from time import sleep
-    from src.modules import Logger
-
-    logger = Logger("../../logs/")
-
-    def test_action(*args):
-        print(f"{datetime.now()}: {args}, ")
-
-    def test_datetime(delay: int):
-        return datetime.now() + timedelta(seconds=delay)
-
-    try:
-        if os.path.exists("campaigns.json"):
-            CampaignManager.delete_state("campaigns.json")
-
-        example_data = InputParser.build_campaign_data(Path("../../data/12-01-2025"))
-        manager = CampaignManager(example_data, "12-01-2025", True, "campaigns.json")
-        scheduler = Scheduler(manager)
-
-        manager.campaigns_workflow["12-01-2025"]["campaign_1"]["1"]["start_time"] = test_datetime(5).isoformat(timespec='seconds')
-        manager.campaigns_workflow["12-01-2025"]["campaign_1"]["2"]["start_time"] = test_datetime(10).isoformat(timespec='seconds')
-        manager.campaigns_workflow["12-01-2025"]["campaign_3"]["1"]["start_time"] = test_datetime(2).isoformat(timespec='seconds')
-
-        # Schedule campaign starts
-        scheduler.schedule_campaign("12-01-2025", "campaign_1", test_action)
-        scheduler.schedule_campaign("12-01-2025", "campaign_3", test_action)
-
-        print(f"Scheduler start at {datetime.now()}")
-        scheduler.run_scheduler()
-        logger.log_logic_event("Scheduler running. Press Ctrl+C to exit.", "INFO")
-        try:
-            while True:
-                sleep(7)
-                scheduler.schedule_next_stage("12-01-2025", "campaign_3", test_action)
-                if not scheduler.schedule_next_stage("12-01-2025", "campaign_1", test_action):
-                    break
-
-        except (KeyboardInterrupt, SystemExit):
-            raise KeyboardInterrupt
-        finally:
-            scheduler.shutdown_scheduler()
-            exit(1)
-
-    except Exception as e:
-        logger.log_logic_event(f"Failed to initialize scheduler: {e}", "ERROR")
-        raise
