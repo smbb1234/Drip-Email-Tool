@@ -83,13 +83,11 @@ class Scheduler:
             sequence = self.campaign_manager.get_stage(campaigns_name, campaign_id, stage)
 
             start_time = self.campaign_manager.get_stage_start_time(campaigns_name, campaign_id, stage)
-            interval = self.campaign_manager.get_stage_interval(campaigns_name, campaign_id, stage)
             if self.schedule_time_exceeded(start_time):
                 logger.log_logic_event(
-                    f"Start time {datetime.isoformat(start_time)} for {campaigns_name} - {campaign_id} - {stage} has already passed. Rescheduled in {interval} seconds.",
+                    f"Start time {datetime.isoformat(start_time)} for {campaigns_name} - {campaign_id} - {stage} has already passed. Skip this task.",
                     "WARNING")
-                start_time = datetime.now() + timedelta(seconds=interval)
-                self.campaign_manager.update_stage_start_time(campaigns_name, campaign_id, stage, start_time)
+                return False
 
             self.scheduler.add_job(
                 action,
