@@ -1,21 +1,22 @@
 # IDE directories
-.idea/
+/.idea/
 
 # log directories
-.logs/
+/logs/
 
 # Temporary directories
-.temp/
-temp*/
+/.temp/
+/temp*/
 
 # Data directories
-data/
+/data/
 
 # Requirements report
 *.docx
 
 # Logs report
 app.log
+debug.log
 
 # API-KEY
 sendgrid.env
