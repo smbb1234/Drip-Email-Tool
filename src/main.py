@@ -223,6 +223,7 @@ def main():
                     current_stage, _ = scheduler.campaign_manager.get_current_stage(campaigns_name, campaign_id)
                     if not scheduler.campaign_manager.completed_stage(campaigns_name, campaign_id, current_stage):
                         continue
+
                     if not scheduler.campaign_manager.completed_campaign(campaigns_name, campaign_id):
                         if not scheduler.schedule_next_stage(
                             campaigns_name=campaigns_name,
@@ -240,6 +241,9 @@ def main():
                                                                                     current_stage)):
                                 scheduler.campaign_manager.move_to_next_stage(campaigns_name, campaign_id)
                         continue
+
+                    else:
+                        scheduler.remove_task(campaigns_name, campaign_id, current_stage)
 
                 if scheduler.campaign_manager.completed_all_campaigns(campaigns_name):
                     scheduler.campaign_manager.del_campaigns(campaigns_name)
