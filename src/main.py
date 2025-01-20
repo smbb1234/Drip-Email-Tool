@@ -132,7 +132,7 @@ def send_email_action(
 
         if success:
             logger.log_event(
-                f"Sent email to {contact_email} for {info["info"]["name"]} on Campaign Name: {campaign_id} from folder: {campaigns_name}, during sequence {current_stage}.")
+                f"Sent email to {contact_email} for {info['info']['name']} on Campaign Name: {campaign_id} from folder: {campaigns_name}, during sequence {current_stage}.")
             campaign_manager.update_contact_status(
                 campaigns_name,
                 campaign_id,
