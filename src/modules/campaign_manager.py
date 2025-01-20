@@ -1,13 +1,15 @@
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Union
+
 from config import config
 from src.modules import logger
 from src.utils import Utils
 
+
 class CampaignManager:
     """Manage email campaigns and track their progress."""
-    CONTACT_ALLOWED_STATUSES = {"Not Started", "Pending", "Email Sent", "Reply Received", "Closed"}
+    CONTACT_ALLOWED_STATUSES = {"Not Started", "Skip", "Pending", "Email Sent", "Reply Received", "Closed"}
     CAMPAIGN_ALLOWED_STATUSES = {"Not Started", "In Progress", "Completed"}
 
     def __init__(self, campaign_data: Dict = None, campaigns_name: str = datetime.now().strftime("%d-%m-%Y"), file_persistence: bool = config.FILE_PERSISTENCE, store_file: str = config.CAMPAIGN_PATH):
@@ -270,8 +272,10 @@ class CampaignManager:
             return False
 
         for contact_email, contact in sequence["contacts"].items():
-            if contact["progress"] != "Not Started":
-                logger.log_event(f"Contact {contact} has already started located at sequence {current_stage}, campaign {campaign_id}, folder {campaigns_name}", "WARNING")
+            if contact["progress"] not in {"Not Started", "Skip", "Pending"}:
+                logger.log_event(
+                    f"Contact {contact['info']['name']} has already started located at sequence {current_stage}, campaign {campaign_id}, folder {campaigns_name}",
+                    "WARNING")
             self.update_contact_status(campaigns_name, campaign_id, current_stage, contact_email, "Pending")
 
         self.update_stage_status(campaigns_name, campaign_id, current_stage, "In Progress")
@@ -293,8 +297,10 @@ class CampaignManager:
         sequence = self.get_stage(campaigns_name, campaign_id, next_stage)
 
         for contact_email, contact in sequence["contacts"].items():
-            if contact["progress"] != "Not Started":
-                logger.log_event(f"Contact {contact} has already started located at sequence {current_stage}, campaign {campaign_id}, folder {campaigns_name}", "WARNING")
+            if contact["progress"] not in {"Not Started", "Skip"}:
+                logger.log_event(
+                    f"Contact {contact['info']['name']} has already started located at sequence {current_stage}, campaign {campaign_id}, folder {campaigns_name}",
+                    "WARNING")
             self.update_contact_status(campaigns_name, campaign_id, next_stage, contact_email, "Pending")
 
         self.update_stage_status(campaigns_name, campaign_id, next_stage, "In Progress")
@@ -310,6 +316,7 @@ class CampaignManager:
 
         for _, contact in sequence["contacts"].items():
             if contact["progress"] not in {
+                "Skip",
                 "Email Sent",
                 "Reply Received",
                 "Closed"
