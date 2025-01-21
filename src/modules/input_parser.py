@@ -166,6 +166,10 @@ class InputParser:
         # Parsing schedules and templates
         schedule = InputParser.load_schedule(schedule_file)
 
+        if not Validator.validate_start_times(schedule):
+            logger.log_logic_event(f"Invalid start times in {schedule_file.resolve()}", "ERROR")
+            return {}
+
         campaigns_data = {}
         for campaign in schedule:
             campaign_id = campaign["campaign_id"]

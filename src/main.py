@@ -67,7 +67,6 @@ def process_directory(path: Union[str, Path], **kwargs):
     except Exception as e:
         logger.log_logic_event(f"{e}", "ERROR")
 
-
 # Start the campaigns_name
 def start_campaigns(scheduler: Scheduler = None, campaigns_name: str = None, action: callable = None) -> bool:
     if scheduler is None or campaigns_name is None or action is None:
@@ -76,24 +75,10 @@ def start_campaigns(scheduler: Scheduler = None, campaigns_name: str = None, act
 
     for campaign_id, campaign in scheduler.campaign_manager.get_campaigns(campaigns_name).items():
 
-        while not scheduler.schedule_campaign(campaigns_name=campaigns_name, campaign_id=campaign_id, action=action):
-            if not scheduler.schedule_time_exceeded(
-                    scheduler.campaign_manager.get_campaign_start_time(campaigns_name, campaign_id)
-            ):
-                break
+        if not scheduler.schedule_campaign(campaigns_name=campaigns_name, campaign_id=campaign_id, action=action):
+            logger.log_logic_event(f"Failed to schedule campaign {campaign_id} for {campaigns_name}.", "ERROR")
+            return False
 
-            current_stage, total_stage = scheduler.campaign_manager.get_current_stage(campaigns_name, campaign_id)
-            sequence = scheduler.campaign_manager.get_stage(campaigns_name, campaign_id, current_stage)
-
-            for contact_email, _ in sequence["contacts"].items():
-                scheduler.campaign_manager.update_contact_status(campaigns_name, campaign_id, current_stage,
-                                                                 contact_email, "Skip")
-            scheduler.campaign_manager.completed_stage(campaigns_name, campaign_id, current_stage)
-
-            if not scheduler.campaign_manager.move_to_next_stage(campaigns_name, campaign_id):
-                break
-
-        scheduler.campaign_manager.completed_campaign(campaigns_name, campaign_id)
 
 # Define email sending action
 def send_email_action(
@@ -139,6 +124,7 @@ def send_email_action(
                 "Email Sent"
             )
             event.set()
+
         else:
             logger.log_logic_event(
                 f"Failed to send email to {contact_email} for {campaigns_name} - {campaign_id}, stage {current_stage}.",
@@ -195,9 +181,10 @@ def main():
 
             # Schedule campaigns
             if not campaign_manager.add_campaigns(campaigns_data, campaigns_name):
+                logger.log_business_event(f"Failed to add campaigns from {schedule.parent.resolve()}.")
                 continue
 
-            start_campaigns(
+            if start_campaigns(
                 scheduler=scheduler,
                 campaigns_name=campaigns_name,
                 action=lambda contacts, template, campaign_info: send_email_action(
@@ -207,41 +194,47 @@ def main():
                     campaign_manager=campaign_manager,
                     email_sender=email_sender
                 )
-            )
+            ):
+                continue
 
+        if scheduler.campaign_manager.campaigns_workflow == {}:
+            logger.log_business_event("Please adding campaigns.")
         logger.log_event("Application running. Press Ctrl+C to exit.")
 
         # Run scheduler
         scheduler.run_scheduler()
 
         while True:
+            event.wait()
+            sleep(2)
 
             for campaigns_name, _ in scheduler.campaign_manager.campaigns_workflow.copy().items():
+
                 for campaign_id, campaign in scheduler.campaign_manager.get_campaigns(campaigns_name).items():
                     current_stage, _ = scheduler.campaign_manager.get_current_stage(campaigns_name, campaign_id)
+
                     if not scheduler.campaign_manager.completed_stage(campaigns_name, campaign_id, current_stage):
                         continue
 
                     if not scheduler.campaign_manager.completed_campaign(campaigns_name, campaign_id):
+
                         if not scheduler.schedule_next_stage(
-                            campaigns_name=campaigns_name,
-                            campaign_id=campaign_id,
-                            action=lambda contacts, template, campaign_info: send_email_action(
-                                contacts=contacts,
-                                template=template,
-                                campaign_info=campaign_info,
-                                campaign_manager=scheduler.campaign_manager,
-                                email_sender=email_sender
-                            )
+                                campaigns_name=campaigns_name,
+                                campaign_id=campaign_id,
+                                action=lambda contacts, template, campaign_info: send_email_action(
+                                    contacts=contacts,
+                                    template=template,
+                                    campaign_info=campaign_info,
+                                    campaign_manager=scheduler.campaign_manager,
+                                    email_sender=email_sender
+                                )
                         ):
-                            if scheduler.schedule_time_exceeded(
-                                    scheduler.campaign_manager.get_stage_start_time(campaigns_name, campaign_id,
-                                                                                    current_stage)):
-                                scheduler.campaign_manager.move_to_next_stage(campaigns_name, campaign_id)
+                            logger.log_logic_event(
+                                f"Failed to schedule next stage for {campaign_id} in {campaigns_name}.", "ERROR")
+
                         continue
 
-                    else:
-                        scheduler.remove_task(campaigns_name, campaign_id, current_stage)
+                    scheduler.remove_task(campaigns_name, campaign_id, current_stage)
 
                 if scheduler.campaign_manager.completed_all_campaigns(campaigns_name):
                     scheduler.campaign_manager.del_campaigns(campaigns_name)
@@ -249,8 +242,6 @@ def main():
             if scheduler.campaign_manager.campaigns_workflow == {}:
                 logger.log_business_event("Please adding campaigns.")
 
-            event.wait()
-            sleep(5)
             event.clear()
 
     except (KeyboardInterrupt, SystemExit):

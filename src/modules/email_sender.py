@@ -1,3 +1,4 @@
+import re
 from typing import List
 
 import boto3
@@ -54,7 +55,7 @@ class EmailSender:
                         },
                         'Text': {
                             'Charset': config.CHARSET,
-                            'Data': content,
+                            'Data': re.sub(r'<[^>]+>', '', content),
                         },
                     },
                     'Subject': {
