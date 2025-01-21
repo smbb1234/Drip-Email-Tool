@@ -43,6 +43,10 @@ class CampaignManager:
             logger.log_event(f"Campaigns {campaigns_name} already exists.", "ERROR")
             return False
 
+        if campaigns_data is None or campaigns_data == {}:
+            logger.log_event("No campaign data provided.", "ERROR")
+            return False
+
         self.campaigns_workflow[campaigns_name] = campaigns_data
         self.save_state()
         logger.log_event(f"Added new campaigns {campaigns_name}.", "INFO")
@@ -344,7 +348,7 @@ class CampaignManager:
                 return False
 
         self.update_campaign_status(campaigns_name, campaign_id, "Completed")
-        logger.log_event(f"Campaign {campaign_id} completed, in folder {campaigns_name} .", "INFO")
+        logger.log_event(f"Campaign {campaign_id} completed, in folder {campaigns_name}.", "INFO")
         return True
 
     def completed_all_campaigns(self, campaigns_name: str) -> bool:

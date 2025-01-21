@@ -1,9 +1,13 @@
+import re
+from typing import List
+
 import boto3
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
-from typing import List
+
 from config import config
 from src.modules import logger
 from src.utils import Validator
+
 
 class EmailSender:
     """Class to handle sending emails using SendGrid."""
@@ -51,7 +55,7 @@ class EmailSender:
                         },
                         'Text': {
                             'Charset': config.CHARSET,
-                            'Data': content,
+                            'Data': re.sub(r'<[^>]+>', '', content),
                         },
                     },
                     'Subject': {

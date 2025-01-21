@@ -1,6 +1,9 @@
-from src.modules import logger
+from datetime import datetime
 from pathlib import Path
-from typing import Union
+from typing import Union, List, Dict
+
+from src.modules import logger
+
 
 class Validator:
 
@@ -44,6 +47,48 @@ class Validator:
 
         # Return True if all conditions are met
         return True
+
+    @staticmethod
+    def validate_start_times(schedule: List[Dict]) -> bool:
+        """
+        Validate the start times in a campaign schedule.
+
+        Args:
+            schedule (List[Dict]): A list of campaigns, each containing a "start_time" field.
+
+        Returns:
+            bool: True if all start times are valid, False otherwise.
+        """
+        try:
+            if not schedule:
+                raise ValueError("The schedule is empty.")
+
+            current_time = datetime.now()
+
+            for campaign in schedule:
+                for index, sequence in enumerate(campaign["sequences"]):
+                    sequence_time = datetime.fromisoformat(sequence["start_time"])
+
+                    if index == 0:
+                        # First sequence must start in the future
+                        if sequence_time <= current_time:
+                            logger.log_event(
+                                f"Campaign: {campaign["campaign_id"]}, first sequence's start_time {sequence_time} is not in the future.",
+                                "ERROR")
+                            return False
+                    else:
+                        # Ensure current sequence starts after the previous one
+                        previous_time = datetime.fromisoformat(campaign["sequences"][index - 1]["start_time"])
+                        if sequence_time <= previous_time:
+                            logger.log_event(
+                                f"Campaign: {campaign["campaign_id"]}, sequence {index} starts at {sequence_time}, which is not after the previous sequence {previous_time}.")
+                            return False
+
+            return True
+
+        except Exception as e:
+            print(f"An error occurred during validation: {e}")
+            return False
 
 if __name__ == "__main__":
     # Test the email format validator

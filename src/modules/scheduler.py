@@ -84,10 +84,7 @@ class Scheduler:
 
             start_time = self.campaign_manager.get_stage_start_time(campaigns_name, campaign_id, stage)
             if self.schedule_time_exceeded(start_time):
-                logger.log_logic_event(
-                    f"Start time {datetime.isoformat(start_time)} for {campaigns_name} - {campaign_id} - {stage} has already passed. Skip this task.",
-                    "WARNING")
-                return False
+                start_time = datetime.now() + timedelta(seconds=0.5)
 
             self.scheduler.add_job(
                 action,

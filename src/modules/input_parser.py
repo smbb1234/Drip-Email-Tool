@@ -1,12 +1,15 @@
-import pandas as pd
 import json
-import yaml
 import re
 from pathlib import Path
 from typing import List, Dict
+
+import pandas as pd
+import yaml
+
 from config import config
 from src.modules import logger
 from src.utils import Validator
+
 
 class InputParser:
     """
@@ -163,6 +166,10 @@ class InputParser:
         # Parsing schedules and templates
         schedule = InputParser.load_schedule(schedule_file)
 
+        if not Validator.validate_start_times(schedule):
+            logger.log_logic_event(f"Invalid start times in {schedule_file.resolve()}", "ERROR")
+            return {}
+
         campaigns_data = {}
         for campaign in schedule:
             campaign_id = campaign["campaign_id"]
@@ -254,9 +261,11 @@ if __name__ == "__main__":
     #     log_event(f"Error during processing: {e}", "ERROR")
 
     # Build campaign data
-    campaigns_file = base_directory / "12-01-2025"
+    campaigns_file = base_directory / "2025" / "Jan" / "12Sun"
     campaign_data = InputParser.build_campaign_data(campaigns_file)
     print("Campaign data:", campaign_data)
+    str = campaign_data["20Mon2025_AIML"]["1"]["template"]["content"]
+    print(re.sub(r'<[^>]+>', '', str))
     # with open(base_directory / "campaigns.json", "w") as f:
     #     json.dump(campaign_data, f, indent=2)
 
