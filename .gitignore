@@ -1,31 +1,34 @@
 # IDE directories
-/.idea/
+**/.idea/
 
 # log directories
-/logs/
+**/logs/
 
 # Temporary directories
-/.temp/
-/temp*/
+**/.temp/
+**/temp*/
 
 # Data directories
-/data/
+**/data/
+
+# Python virtual environment directories
+**/*venv/
 
 # Requirements report
-*.docx
+**/*.docx
 
 # Logs report
-app.log
-debug.log
+**/app.log
+**/debug.log
 
 # API-KEY
-sendgrid.env
+**/sendgrid.env
 
 # Guide Book
-Environment Configuration Guide.md
+**/Environment Configuration Guide.md
 
 # Temporary data files
-campaigns.json
+**/campaigns.json
 
 # Compiled files
-*.pyc
+**/*.pyc
