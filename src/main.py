@@ -107,11 +107,13 @@ def send_email_action(
             continue
         logger.log_logic_event(f"Email has been generated and ready to be sent...", "INFO")
 
-        success = email_sender.send_email(
-            recipients=[contact_email],
-            subject=subject,
-            content=content
-        )
+        # success = email_sender.send_email(
+        #     recipients=[contact_email],
+        #     subject=subject,
+        #     content=content
+        # )
+        print([[contact_email], subject, content])
+        success = True
 
         if success:
             logger.log_event(

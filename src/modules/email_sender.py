@@ -122,3 +122,44 @@ class EmailSender:
         except Exception as e:
             logger.log_logic_event(f"An error occurred while building email content: {e}", "ERROR")
             return "", ""
+
+
+if __name__ == "__main__":
+    from src.modules import CampaignManager
+    from src.modules import InputParser
+    from pathlib import Path
+
+    try:
+        example_data = InputParser.build_campaign_data(Path("../../data/12-01-2025"))
+        manager = CampaignManager(example_data, "12-01-2025")
+
+        target_user = manager.get_contact("12-01-2025", "campaign_1", 1, "john.doe@example.com")
+        target_template = manager.get_stage_template("12-01-2025", "campaign_1", 1)
+
+        subject, content = EmailSender.build_email_content(target_template, target_user)
+
+        print(f"Subject: {subject}\nContent: {content}")
+
+        email_sender = EmailSender()
+
+        # Example email details
+        # recipient_email = "jbl1990926@gmail.com"
+        # subject = "Welcome to Our Service"
+        # content = "<h1>Hello!</h1><p>Thank you for signing up.</p>"
+
+        recipients = [
+            "john.doe@example.com"
+        ]
+        success = email_sender.send_email(recipients, subject, content)
+
+        # params = {
+        #     "start_date": "2025-01-07"
+        # }
+        # # Fetch email metrics
+        # email_metrics = email_sender.get_email_states(params)
+        # for metric in email_metrics:
+        #     print(metric)
+
+    except Exception as e:
+        logger.log_logic_event(f"Failed to load input data: {e}", "ERROR")
+        exit(1)

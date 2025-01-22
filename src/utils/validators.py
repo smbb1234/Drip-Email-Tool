@@ -119,3 +119,19 @@ class Validator:
         except Exception as e:
             print(f"An error occurred during validation: {e}")
             return []
+
+
+if __name__ == "__main__":
+    # Test the email format validator
+    # print(Validator.is_valid_structure("../../data/2025/Jan/16Thu"))
+    # print(Validator.is_valid_structure("../../data/2025/Jan/17Fri"))
+    # print(Validator.is_valid_structure("../../data/12-01-2025"))
+
+    from src.modules import InputParser
+    from config import config
+
+    test_directory = Path("../../" + config.DATA_DIR)
+    example_data = InputParser.load_schedule(test_directory / "2025/Jan/12Sun/schedule.json")
+    print(example_data)
+    print(Validator.validate_stage_time_order(example_data))
+    print(Validator.filter_expired_campaign(example_data))
