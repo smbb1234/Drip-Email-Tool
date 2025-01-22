@@ -166,9 +166,12 @@ class InputParser:
         # Parsing schedules and templates
         schedule = InputParser.load_schedule(schedule_file)
 
-        if not Validator.validate_start_times(schedule):
-            logger.log_logic_event(f"Invalid start times in {schedule_file.resolve()}", "ERROR")
+        if not Validator.validate_stage_time_order(schedule):
+            logger.log_logic_event(f"Invalid stage time order in {schedule_file.resolve()}", "ERROR")
             return {}
+
+        # Filter out expired campaigns
+        schedule = Validator.filter_expired_campaign(schedule)
 
         campaigns_data = {}
         for campaign in schedule:
@@ -227,13 +230,25 @@ class InputParser:
                 template = sequence_template_mapping.get(sequence_id)
 
                 if template:
-                    campaigns_data[campaign_id][str(sequence_id)] = {
-                        "sequence_status": "Not Started",
-                        "start_time": seq['start_time'],
-                        "interval": seq['interval'],
-                        "template": template,
-                        "contacts": richer_contacts
-                    }
+                    if seq['start_time'] != "expired":
+                        campaigns_data[campaign_id][str(sequence_id)] = {
+                            "sequence_status": "Not Started",
+                            "start_time": seq['start_time'],
+                            "interval": seq['interval'],
+                            "template": template,
+                            "contacts": richer_contacts
+                        }
+                    else:
+                        campaigns_data[campaign_id]["campaign_status"] = "In Progress"
+                        campaigns_data[campaign_id][str(sequence_id)] = {
+                            "sequence_status": "Completed",
+                            "start_time": "",
+                            "interval": "",
+                            "template": None,
+                            "contacts": richer_contacts
+                        }
+                        for _, detail in richer_contacts.items():
+                            detail["progress"] = "Skip"
                 else:
                     logger.log_logic_event(f"Template not found for {campaign_id} / {sequence_id}", "ERROR")
         return campaigns_data

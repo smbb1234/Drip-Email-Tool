@@ -185,12 +185,10 @@ class CampaignManager:
 
         total_stage = len(campaign) - 1
 
-        if campaign["campaign_status"] == "Not Started":
-            return 1, total_stage
-
-        for sequence_id in range(total_stage, 0, -1):
-            if campaign[str(sequence_id)]["sequence_status"] != "Not Started":
+        for sequence_id in range(1, total_stage + 1):
+            if campaign[str(sequence_id)]["sequence_status"] != "Completed":
                 return sequence_id, total_stage
+            continue
 
         return total_stage, total_stage
 
@@ -203,13 +201,6 @@ class CampaignManager:
 
         return sequence["template"]
 
-    def get_campaign_start_time(self, campaigns_name: str, campaign_id: str):
-        """
-        Get the start time for the campaign.
-        The start time of the first stage is agreed to be the start time of the campaign
-        """
-        return self.get_stage_start_time(campaigns_name, campaign_id, 1)
-
     def get_stage_start_time(self, campaigns_name: str, campaign_id: str, stage: int):
         """Get the start time for the stage."""
         sequence = self.get_stage(campaigns_name, campaign_id, stage)
@@ -218,27 +209,6 @@ class CampaignManager:
             return None
 
         return datetime.fromisoformat(sequence["start_time"])
-
-    def update_stage_start_time(self, campaigns_name: str, campaign_id: str, stage: int, new_time: datetime) -> bool:
-        """Update the start time for the stage."""
-        sequence = self.get_stage(campaigns_name, campaign_id, stage)
-
-        if not sequence:
-            return False
-
-        sequence["start_time"] = new_time.isoformat(timespec='seconds')
-        self.save_state()
-        logger.log_logic_event(f"Updated start time for stage {stage} in {campaigns_name} - {campaign_id}.", "INFO")
-        return True
-
-    def get_stage_interval(self, campaigns_name: str, campaign_id: str, stage: int) -> int:
-        """Get the interval for the stage."""
-        sequence = self.get_stage(campaigns_name, campaign_id, stage)
-
-        if not sequence:
-            return 0
-
-        return sequence["interval"]
 
     def is_end_of_stage(self, campaigns_name: str, campaign_id: str) -> bool:
         """Check if the stage is the last stage in the campaign."""
@@ -249,15 +219,6 @@ class CampaignManager:
 
         return current_stage >= total_stage
 
-    def get_next_stage_start_time(self, campaigns_name: str, campaign_id: str):
-        """Get the start time for the next stage in the campaign."""
-        if self.is_end_of_stage(campaigns_name, campaign_id):
-            return None
-
-        current_stage, total_stage = self.get_current_stage(campaigns_name, campaign_id)
-
-        return self.get_stage_start_time(campaigns_name, campaign_id, current_stage + 1)
-
     def start_campaign(self, campaigns_name: str, campaign_id: str) -> bool:
         """Start the campaign by updating its status."""
         campaign = self.get_campaign(campaigns_name, campaign_id)
@@ -267,6 +228,8 @@ class CampaignManager:
 
         if campaign["campaign_status"] != "Not Started":
             logger.log_event(f"Campaign {campaign_id} in {campaigns_name} has already started.", "WARNING")
+        else:
+            self.update_campaign_status(campaigns_name, campaign_id, "In Progress")
 
         current_stage, total_stage = self.get_current_stage(campaigns_name, campaign_id)
         sequence = self.get_stage(campaigns_name, campaign_id, current_stage)
@@ -276,39 +239,16 @@ class CampaignManager:
             return False
 
         for contact_email, contact in sequence["contacts"].items():
-            if contact["progress"] not in {"Not Started", "Skip", "Pending"}:
+            if contact["progress"] != "Not Started":
                 logger.log_event(
                     f"Contact {contact['info']['name']} has already started located at sequence {current_stage}, campaign {campaign_id}, folder {campaigns_name}",
                     "WARNING")
+                continue
             self.update_contact_status(campaigns_name, campaign_id, current_stage, contact_email, "Pending")
 
         self.update_stage_status(campaigns_name, campaign_id, current_stage, "In Progress")
-        self.update_campaign_status(campaigns_name, campaign_id, "In Progress")
+
         logger.log_event(f"Campaign {campaign_id} started.", "INFO")
-        return True
-
-    def move_to_next_stage(self, campaigns_name: str, campaign_id: str) -> bool:
-        """Start to the next stage in the campaign."""
-        campaign = self.get_campaign(campaigns_name, campaign_id)
-
-        if not campaign:
-            return False
-        if self.is_end_of_stage(campaigns_name, campaign_id):
-            return False
-
-        current_stage, _ = self.get_current_stage(campaigns_name, campaign_id)
-        next_stage = current_stage + 1
-        sequence = self.get_stage(campaigns_name, campaign_id, next_stage)
-
-        for contact_email, contact in sequence["contacts"].items():
-            if contact["progress"] not in {"Not Started", "Skip"}:
-                logger.log_event(
-                    f"Contact {contact['info']['name']} has already started located at sequence {current_stage}, campaign {campaign_id}, folder {campaigns_name}",
-                    "WARNING")
-            self.update_contact_status(campaigns_name, campaign_id, next_stage, contact_email, "Pending")
-
-        self.update_stage_status(campaigns_name, campaign_id, next_stage, "In Progress")
-        logger.log_event(f"Started to next sequence {next_stage}, campaign {campaign_id}, folder {campaigns_name}.", "INFO")
         return True
 
     def completed_stage(self, campaigns_name: str, campaign_id: str, stage: int) -> bool:
