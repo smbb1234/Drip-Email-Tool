@@ -83,8 +83,10 @@ class Scheduler:
             sequence = self.campaign_manager.get_stage(campaigns_name, campaign_id, stage)
 
             start_time = self.campaign_manager.get_stage_start_time(campaigns_name, campaign_id, stage)
-            if self.schedule_time_exceeded(start_time):
-                start_time = datetime.now() + timedelta(seconds=0.5)
+            if start_time == "":
+                logger.log_logic_event(
+                    f"Failed to add task for {campaigns_name} - {campaign_id} - {stage}: Start time not found.",
+                    "ERROR")
 
             self.scheduler.add_job(
                 action,
@@ -122,13 +124,6 @@ class Scheduler:
         except Exception as e:
             logger.log_logic_event(f"Failed to remove task for {campaigns_name} - {campaign_id} - {stage}: {e}", "ERROR")
             return False
-
-    @staticmethod
-    def schedule_time_exceeded(input_time: datetime) -> bool:
-        """Check if the input time has already passed."""
-        if input_time <= datetime.now():
-            return True
-        return False
 
     def run_scheduler(self):
         """Run the scheduler."""

@@ -239,6 +239,7 @@ class InputParser:
                             "contacts": richer_contacts
                         }
                     else:
+                        campaigns_data[campaign_id]["campaign_status"] = "In Progress"
                         campaigns_data[campaign_id][str(sequence_id)] = {
                             "sequence_status": "Completed",
                             "start_time": "",

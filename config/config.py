@@ -23,4 +23,4 @@ CHARSET = "UTF-8"
 SENDER_EMAIL = "ramya@DiagonalMatrix.com"
 
 # Enable debug mode
-DEBUG_MODE = False
+DEBUG_MODE = True
