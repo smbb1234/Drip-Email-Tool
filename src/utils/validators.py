@@ -49,40 +49,32 @@ class Validator:
         return True
 
     @staticmethod
-    def validate_start_times(schedule: List[Dict]) -> bool:
-        """
-        Validate the start times in a campaign schedule.
+    def validate_time_exceeded(input_time: datetime) -> bool:
+        """Check if the input time has already passed."""
+        if input_time <= datetime.now():
+            return True
+        return False
 
-        Args:
-            schedule (List[Dict]): A list of campaigns, each containing a "start_time" field.
-
-        Returns:
-            bool: True if all start times are valid, False otherwise.
-        """
+    @staticmethod
+    def validate_stage_time_order(schedule: List[Dict]) -> bool:
+        """Check if the stages are in ascending order."""
         try:
             if not schedule:
                 raise ValueError("The schedule is empty.")
 
-            current_time = datetime.now()
-
             for campaign in schedule:
-                for index, sequence in enumerate(campaign["sequences"]):
+                for sequence_index, sequence in enumerate(campaign["sequences"]):
                     sequence_time = datetime.fromisoformat(sequence["start_time"])
 
-                    if index == 0:
-                        # First sequence must start in the future
-                        if sequence_time <= current_time:
-                            logger.log_event(
-                                f"Campaign: {campaign["campaign_id"]}, first sequence's start_time {sequence_time} is not in the future.",
-                                "ERROR")
-                            return False
-                    else:
-                        # Ensure current sequence starts after the previous one
-                        previous_time = datetime.fromisoformat(campaign["sequences"][index - 1]["start_time"])
-                        if sequence_time <= previous_time:
-                            logger.log_event(
-                                f"Campaign: {campaign["campaign_id"]}, sequence {index} starts at {sequence_time}, which is not after the previous sequence {previous_time}.")
-                            return False
+                    if sequence_index == 0:
+                        continue
+
+                    prev_sequence_time = datetime.fromisoformat(campaign["sequences"][sequence_index - 1]["start_time"])
+                    if sequence_time <= prev_sequence_time:
+                        logger.log_event(
+                            f"Sequence {sequence_index + 1} of campaign: {campaign['campaign_id']} starts at {sequence_time}, which is not after the previous sequence at {prev_sequence_time}.",
+                            "ERROR")
+                        return False
 
             return True
 
@@ -90,8 +82,56 @@ class Validator:
             print(f"An error occurred during validation: {e}")
             return False
 
+    @staticmethod
+    def filter_expired_campaign(schedule: List[Dict]) -> List[Dict]:
+        """Filter out expired campaigns."""
+        try:
+            if not schedule:
+                raise ValueError("The schedule is empty.")
+
+            for campaign_index, campaign in enumerate(schedule.copy()):
+                for sequence_index, rev_sequence in enumerate(reversed(campaign["sequences"])):
+                    sequence_time = datetime.fromisoformat(rev_sequence["start_time"])
+
+                    if sequence_index == 0:
+                        # Check if the campaign has expired
+                        if Validator.validate_time_exceeded(sequence_time):
+                            logger.log_event(
+                                f"Campaign: {campaign['campaign_id']} expired.",
+                                "ERROR")
+                            schedule.remove(campaign)
+                            break
+                    continue
+
+            for campaign_index, campaign in enumerate(schedule.copy()):
+                total_stage = len(campaign["sequences"])
+                for sequence_index, sequence in enumerate(campaign["sequences"]):
+                    sequence_time = datetime.fromisoformat(sequence["start_time"])
+                    # Check if the stage has expired
+                    if Validator.validate_time_exceeded(sequence_time):
+                        logger.log_event(
+                            f"Stage: {sequence_index + 1} of campaign: {campaign['campaign_id']} expired.",
+                            "ERROR")
+                        schedule[campaign_index]["sequences"][sequence_index]["start_time"] = "expired"
+                        break
+
+            return schedule
+
+        except Exception as e:
+            print(f"An error occurred during validation: {e}")
+            return []
+
 if __name__ == "__main__":
     # Test the email format validator
-    print(Validator.is_valid_structure("../../data/2025/Jan/16Thu"))
-    print(Validator.is_valid_structure("../../data/2025/Jan/17Fri"))
-    print(Validator.is_valid_structure("../../data/12-01-2025"))
+    # print(Validator.is_valid_structure("../../data/2025/Jan/16Thu"))
+    # print(Validator.is_valid_structure("../../data/2025/Jan/17Fri"))
+    # print(Validator.is_valid_structure("../../data/12-01-2025"))
+
+    from src.modules import InputParser
+    from config import config
+
+    test_directory = Path("../../" + config.DATA_DIR)
+    example_data = InputParser.load_schedule(test_directory / "2025/Jan/12Sun/schedule.json")
+    print(example_data)
+    print(Validator.validate_stage_time_order(example_data))
+    print(Validator.filter_expired_campaign(example_data))
