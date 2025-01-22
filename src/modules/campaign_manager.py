@@ -185,16 +185,12 @@ class CampaignManager:
 
         total_stage = len(campaign) - 1
 
-        if campaign["campaign_status"] == "Not Started":
-            return 1, total_stage
-
-        for sequence_id in range(total_stage, 0, -1):
-            if campaign[str(sequence_id)]["sequence_status"] == "Not Started":
-                continue
-            elif campaign[str(sequence_id)]["sequence_status"] == "In Progress":
+        for sequence_id in range(1, total_stage + 1):
+            if campaign[str(sequence_id)]["sequence_status"] != "Completed":
                 return sequence_id, total_stage
-            else:
-                return sequence_id + 1 if sequence_id < total_stage else total_stage, total_stage
+            continue
+
+        return total_stage, total_stage
 
     def get_stage_template(self, campaigns_name: str, campaign_id: str, stage: int) -> Dict:
         """Get the template for the current stage of a campaign."""
@@ -253,31 +249,6 @@ class CampaignManager:
         self.update_stage_status(campaigns_name, campaign_id, current_stage, "In Progress")
 
         logger.log_event(f"Campaign {campaign_id} started.", "INFO")
-        return True
-
-    def move_to_next_stage(self, campaigns_name: str, campaign_id: str) -> bool:
-        """Start to the next stage in the campaign."""
-        campaign = self.get_campaign(campaigns_name, campaign_id)
-
-        if not campaign:
-            return False
-        if self.is_end_of_stage(campaigns_name, campaign_id):
-            return False
-
-        current_stage, _ = self.get_current_stage(campaigns_name, campaign_id)
-        next_stage = current_stage + 1
-        sequence = self.get_stage(campaigns_name, campaign_id, next_stage)
-
-        for contact_email, contact in sequence["contacts"].items():
-            if contact["progress"] != "Not Started":
-                logger.log_event(
-                    f"Contact {contact['info']['name']} has already started located at sequence {current_stage}, campaign {campaign_id}, folder {campaigns_name}",
-                    "WARNING")
-                continue
-            self.update_contact_status(campaigns_name, campaign_id, next_stage, contact_email, "Pending")
-
-        self.update_stage_status(campaigns_name, campaign_id, next_stage, "In Progress")
-        logger.log_event(f"Started to next sequence {next_stage}, campaign {campaign_id}, folder {campaigns_name}.", "INFO")
         return True
 
     def completed_stage(self, campaigns_name: str, campaign_id: str, stage: int) -> bool:

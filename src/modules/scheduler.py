@@ -45,13 +45,7 @@ class Scheduler:
 
             current_stage, total_stage = self.campaign_manager.get_current_stage(campaigns_name, campaign_id)
 
-            self.remove_task(campaigns_name, campaign_id, current_stage)
-
-            if not self.campaign_manager.move_to_next_stage(campaigns_name, campaign_id):
-                self.campaign_manager.update_stage_status(campaigns_name, campaign_id, current_stage, "Completed")
-                return False
-
-            current_stage, _ = self.campaign_manager.get_current_stage(campaigns_name, campaign_id)
+            self.remove_task(campaigns_name, campaign_id, current_stage - 1)
 
             if not self.add_task(campaigns_name, campaign_id, current_stage, action):
                logger.log_logic_event(f"Failed to schedule {campaigns_name} - {campaign_id} - {current_stage}.", "ERROR")

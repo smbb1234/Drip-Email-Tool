@@ -113,7 +113,6 @@ class Validator:
                             f"Stage: {sequence_index + 1} of campaign: {campaign['campaign_id']} expired.",
                             "ERROR")
                         schedule[campaign_index]["sequences"][sequence_index]["start_time"] = "expired"
-                        break
 
             return schedule
 
