@@ -20,7 +20,7 @@ RETRY_INTERVAL = 5
 # Email settings
 AWS_REGION = "eu-west-2"
 CHARSET = "UTF-8"
-SENDER_EMAIL = "ramya@DiagonalMatrix.com"
+SENDER_EMAIL = "srujan@DiagonalMatrics.com"
 
 # Enable debug mode
 DEBUG_MODE = False
